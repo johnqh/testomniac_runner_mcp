@@ -3,10 +3,9 @@
  * The MCP server maintains one active browser + page at a time.
  */
 
-import puppeteer, { type Browser, type Page } from "puppeteer-core";
+import puppeteer, { type Browser, type Page } from "puppeteer";
 import type { BrowserAdapter, RuntimeArtifacts } from "@sudobility/testomniac_runner_service";
 
-const DEFAULT_CHROMIUM = process.env["CHROMIUM_PATH"] || "/usr/bin/chromium";
 const DEFAULT_VIEWPORT_WIDTH = 1280;
 const DEFAULT_VIEWPORT_HEIGHT = 800;
 
@@ -15,8 +14,7 @@ let page: Page | null = null;
 
 export async function ensureBrowser(): Promise<Page> {
   if (!browser || !browser.connected) {
-    browser = await puppeteer.launch({
-      executablePath: process.env["CHROMIUM_PATH"] || DEFAULT_CHROMIUM,
+    const launchOptions: Parameters<typeof puppeteer.launch>[0] = {
       headless: true,
       args: [
         "--no-sandbox",
@@ -24,7 +22,12 @@ export async function ensureBrowser(): Promise<Page> {
         "--disable-dev-shm-usage",
         "--disable-gpu",
       ],
-    });
+    };
+    // Allow override if developer has a preferred Chromium install
+    if (process.env["CHROMIUM_PATH"]) {
+      launchOptions.executablePath = process.env["CHROMIUM_PATH"];
+    }
+    browser = await puppeteer.launch(launchOptions);
     page = null;
   }
 

@@ -6,7 +6,7 @@
  * Wraps Puppeteer + the testomniac_runner_service library.
  *
  * Environment variables:
- *   CHROMIUM_PATH         - Path to Chromium executable (default: /usr/bin/chromium)
+ *   CHROMIUM_PATH         - Optional override for Chromium path (default: bundled)
  *   TESTOMNIAC_API_URL    - Base URL of the API (required for full scans)
  *   TESTOMNIAC_API_KEY    - Scanner API key (required for full scans)
  */

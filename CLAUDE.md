@@ -2,14 +2,14 @@
 
 MCP server that gives AI assistants direct browser control and test execution capabilities via Puppeteer and the testomniac_runner_service.
 
-**Package**: `@sudobility/testomniac_runner_mcp` (private, BUSL-1.1)
+**Package**: `@sudobility/testomniac_runner_mcp` (BUSL-1.1)
 
 ## Tech Stack
 
 - **Runtime**: Bun
 - **Package Manager**: Bun
 - **MCP SDK**: `@modelcontextprotocol/sdk`
-- **Browser**: Puppeteer Core
+- **Browser**: Puppeteer (bundles Chromium automatically)
 - **Runner Service**: `@sudobility/testomniac_runner_service`
 - **Validation**: Zod
 - **Transport**: stdio
@@ -55,7 +55,7 @@ src/
 
 | Variable | Required | Description |
 |----------|----------|-------------|
-| `CHROMIUM_PATH` | No | Path to Chromium executable (default: `/usr/bin/chromium`) |
+| `CHROMIUM_PATH` | No | Override path to Chromium (default: uses bundled Chromium from puppeteer) |
 | `TESTOMNIAC_API_URL` | For scans | Base URL of the Testomniac API |
 | `TESTOMNIAC_API_KEY` | For scans | Scanner API key |
 
@@ -107,7 +107,6 @@ Add to `.claude/settings.json`:
       "command": "bun",
       "args": ["run", "/path/to/testomniac_runner_mcp/src/index.ts"],
       "env": {
-        "CHROMIUM_PATH": "/usr/bin/chromium",
         "TESTOMNIAC_API_URL": "http://localhost:8027",
         "TESTOMNIAC_API_KEY": "your-scanner-key"
       }
