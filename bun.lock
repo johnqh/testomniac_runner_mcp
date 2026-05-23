@@ -6,8 +6,8 @@
       "name": "testomniac_runner_mcp",
       "dependencies": {
         "@modelcontextprotocol/sdk": "^1.29.0",
-        "@sudobility/testomniac_runner_service": "^0.1.98",
-        "@sudobility/testomniac_types": "^0.0.58",
+        "@sudobility/testomniac_runner_service": "^0.1.100",
+        "@sudobility/testomniac_types": "^0.0.59",
         "puppeteer": "^25.0.4",
         "zod": "^4.4.3",
       },
@@ -28,9 +28,9 @@
 
     "@puppeteer/browsers": ["@puppeteer/browsers@3.0.3", "", { "dependencies": { "debug": "^4.4.3", "progress": "^2.0.3", "semver": "^7.7.4", "tar-fs": "^3.1.1", "yargs": "^17.7.2" }, "peerDependencies": { "proxy-agent": ">=8.0.1" }, "optionalPeers": ["proxy-agent"], "bin": { "browsers": "lib/main-cli.js" } }, "sha512-v3YaiGpzUTgOZkHBFR0iZg58Vto25SqBQxfLUXDiofJccwVl6Mlr7BdLCS1NZgxikdeIHf936cxYWL9IZp3tow=="],
 
-    "@sudobility/testomniac_runner_service": ["@sudobility/testomniac_runner_service@0.1.98", "", { "peerDependencies": { "@sudobility/testomniac_types": "^0.0.58", "openai": ">=6.0.0", "react": ">=18.0.0" }, "optionalPeers": ["openai", "react"] }, "sha512-8dCg3HuULO47Y93sS18uU8E/8LdHSO7KUh7yLz80VkcXZb7kqK39KVSup5KBJMiBt1iqddbHoM34tBsvuyQiSA=="],
+    "@sudobility/testomniac_runner_service": ["@sudobility/testomniac_runner_service@0.1.100", "", { "peerDependencies": { "@sudobility/testomniac_types": "^0.0.59", "openai": ">=6.0.0", "react": ">=18.0.0" }, "optionalPeers": ["openai", "react"] }, "sha512-yH/ZQHLBD048dNP45OxQkdhMdT1h+KxqIKnEsjmWinQicpkjuOoDLVCIWxgC7FrPGoudxjsSEVrgKOjbtuZuIQ=="],
 
-    "@sudobility/testomniac_types": ["@sudobility/testomniac_types@0.0.58", "", { "peerDependencies": { "@sudobility/types": "^1.9.62" } }, "sha512-9jtkN6M8zvgAN0872YEOZmHIs66OoSln48nC7FsiPG/oyh4Xl2qpxm8mVqSqLQSAfXdWRUtW0tO7LJTeR5rldg=="],
+    "@sudobility/testomniac_types": ["@sudobility/testomniac_types@0.0.59", "", { "peerDependencies": { "@sudobility/types": "^1.9.62" } }, "sha512-8g5ckCizSx12Bl0o1ebD3qKv+bP3DzOYk+zRaYxPlmEIbFoO0dp6hCExJNHmHXHe+SqSVK/yRP2C6Nw9352Ptw=="],
 
     "@sudobility/types": ["@sudobility/types@1.9.62", "", {}, "sha512-GOkz5oE7Fmlolba2aemBF2fKPtH4I2lHAjVta+fqZAoAV72DQaWYzVEjTwKZs/ACY/g9Z262IDa7lEh+IOrn7w=="],
 
