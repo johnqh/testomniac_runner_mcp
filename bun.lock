@@ -6,7 +6,7 @@
       "name": "testomniac_runner_mcp",
       "dependencies": {
         "@modelcontextprotocol/sdk": "^1.29.0",
-        "@sudobility/testomniac_runner_service": "^0.1.121",
+        "@sudobility/testomniac_runner_service": "^0.1.122",
         "@sudobility/testomniac_types": "^0.0.62",
         "puppeteer": "^25.0.4",
         "zod": "^4.4.3",
@@ -28,7 +28,7 @@
 
     "@puppeteer/browsers": ["@puppeteer/browsers@3.0.3", "", { "dependencies": { "debug": "^4.4.3", "progress": "^2.0.3", "semver": "^7.7.4", "tar-fs": "^3.1.1", "yargs": "^17.7.2" }, "peerDependencies": { "proxy-agent": ">=8.0.1" }, "optionalPeers": ["proxy-agent"], "bin": { "browsers": "lib/main-cli.js" } }, "sha512-v3YaiGpzUTgOZkHBFR0iZg58Vto25SqBQxfLUXDiofJccwVl6Mlr7BdLCS1NZgxikdeIHf936cxYWL9IZp3tow=="],
 
-    "@sudobility/testomniac_runner_service": ["@sudobility/testomniac_runner_service@0.1.121", "", { "peerDependencies": { "@sudobility/testomniac_types": "^0.0.62", "openai": ">=6.0.0", "react": ">=18.0.0" }, "optionalPeers": ["openai", "react"] }, "sha512-pIg28WPpgjjiKMAEjKzWw00rW1DaoOvqvp+kP0epXqRFwVKy7jJBXBPXx/AMjBPEd852i5Nl1E3uYxfDtCPKkQ=="],
+    "@sudobility/testomniac_runner_service": ["@sudobility/testomniac_runner_service@0.1.122", "", { "peerDependencies": { "@sudobility/testomniac_types": "^0.0.62", "openai": ">=6.0.0", "react": ">=18.0.0" }, "optionalPeers": ["openai", "react"] }, "sha512-sWoIClvp+8GBG2fp5Fy3z22H0foOcyPSu5BE5A6R+d3iS7qTFP92+46s4KjTJF0qbpVH19tXEuSOVr6kBdj9hA=="],
 
     "@sudobility/testomniac_types": ["@sudobility/testomniac_types@0.0.62", "", { "peerDependencies": { "@sudobility/types": "^1.9.62" } }, "sha512-uP2kh33+1w7Mf125LtBi50AOS3EOFcYAvvT4+RI7ylooND7FWZehsjjMBbqZ9G+A75q2I8kz+8hlinTsCZNqDA=="],
 
