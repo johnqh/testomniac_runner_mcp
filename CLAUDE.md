@@ -42,8 +42,10 @@ bun run start      # Run production bundle
 ```
 src/
 ├── index.ts             # Entry point: server setup, signal handlers, transport
-├── browser-session.ts   # Puppeteer browser lifecycle + BrowserAdapter factory
+├── browser-session.ts   # Puppeteer browser lifecycle + persistent BrowserAdapter
+├── api-config.ts        # API URL/key state (env vars + runtime override via set_api_key)
 └── tools/
+    ├── config.ts            # set_api_key
     ├── browser.ts           # browser_launch, browser_navigate, browser_click, browser_type, browser_screenshot, browser_get_content, browser_evaluate, browser_get_logs, browser_close, browser_status
     ├── analysis.ts          # extract_actionable_items, extract_forms, detect_login_page, evaluate_page_health, build_dom_snapshot, detect_scaffolds, decompose_page
     ├── test-generation.ts   # generate_render_test, generate_interaction_test, generate_form_test, generate_navigation_test, generate_e2e_test
@@ -56,10 +58,22 @@ src/
 | Variable | Required | Description |
 |----------|----------|-------------|
 | `CHROMIUM_PATH` | No | Override path to Chromium (default: uses bundled Chromium from puppeteer) |
-| `TESTOMNIAC_API_URL` | For scans | Base URL of the Testomniac API |
-| `TESTOMNIAC_API_KEY` | For scans | Scanner API key |
+| `TESTOMNIAC_API_URL` | For scans | Base URL of the Testomniac API (overridable via `set_api_key`) |
+| `TESTOMNIAC_API_KEY` | For scans | API key — master key (server) or entity key (local dev, overridable via `set_api_key`) |
 
-## Tools (25)
+## API Key Configuration
+
+Two types of API keys are supported:
+
+1. **Master API key** — Shared between `testomniac_runner` and `testomniac_api` on the server. Set via `TESTOMNIAC_API_KEY` environment variable.
+2. **Entity API key** — User-defined key associated with an entity in `testomniac_api`. For local development, set at runtime using the `set_api_key` tool.
+
+When no key is provided via `set_api_key`, the `TESTOMNIAC_API_KEY` environment variable is used as the default.
+
+## Tools (28)
+
+### Configuration (1)
+- `set_api_key` — Set API key and optionally API URL at runtime (for local development with entity keys)
 
 ### Browser Control (10)
 - `browser_launch` — Launch headless browser with optional viewport
@@ -93,8 +107,10 @@ src/
 - `run_all_expertises` — Run all 7 expertise modules (Tester, SEO, Security, Performance, Content, UI, Accessibility)
 - `run_expertise` — Run a specific expertise module
 
-### Full Scan (1)
-- `run_full_scan` — Execute a complete Testomniac discovery scan (requires API)
+### Execution (3)
+- `run_full_scan` — Execute a discovery scan in-process (automatically detects personas after completion)
+- `execute_run` — Execute a test run locally via bundled runner process (one-shot mode)
+- `execute_sequence` — Execute a test sequence run locally via bundled runner process
 
 ## Usage with Claude Code
 
@@ -117,7 +133,8 @@ Add to `.claude/settings.json`:
 
 ## Related Projects
 
-- **testomniac_runner_service** — Shared test execution library this MCP wraps
+- **testomniac_runner_service** — Shared test execution library this MCP wraps (`@sudobility/testomniac_runner_service`)
+- **testomniac_types** — Shared type definitions (`@sudobility/testomniac_types`)
 - **testomniac_runner** — Server-side worker (polling-based, not MCP)
 - **testomniac_api** — The API server for persistence
-- **testomniac_api_mcp** — MCP for the API endpoints (companion to this project)
+- **testomniac_api_mcp** — MCP for the API endpoints (companion: this MCP controls the browser, api_mcp queries the API)

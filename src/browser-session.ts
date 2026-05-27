@@ -11,6 +11,7 @@ const DEFAULT_VIEWPORT_HEIGHT = 800;
 
 let browser: Browser | null = null;
 let page: Page | null = null;
+let adapter: BrowserAdapter | null = null;
 
 export async function ensureBrowser(): Promise<Page> {
   if (!browser || !browser.connected) {
@@ -33,6 +34,7 @@ export async function ensureBrowser(): Promise<Page> {
 
   if (!page || page.isClosed()) {
     page = await browser.newPage();
+    adapter = null; // reset so it's recreated for the new page
     await page.setViewport({
       width: DEFAULT_VIEWPORT_WIDTH,
       height: DEFAULT_VIEWPORT_HEIGHT,
@@ -50,6 +52,7 @@ export async function getPage(): Promise<Page> {
 }
 
 export async function closeBrowser(): Promise<void> {
+  adapter = null;
   if (page && !page.isClosed()) {
     await page.close().catch(() => {});
     page = null;
@@ -65,8 +68,21 @@ export function isBrowserActive(): boolean {
 }
 
 /**
- * Creates a BrowserAdapter from the current Puppeteer page.
- * This adapter can be passed to runner service functions.
+ * Returns the persistent BrowserAdapter for the current page.
+ * Lazily creates one if needed. Logs accumulate across the session.
+ */
+export async function getAdapter(): Promise<BrowserAdapter> {
+  const p = await getPage();
+  if (!adapter) {
+    adapter = createAdapter(p);
+  }
+  return adapter;
+}
+
+/**
+ * Creates a BrowserAdapter from a Puppeteer page.
+ * Prefer getAdapter() for shared state (logs). This is exposed for
+ * cases that need a fresh adapter (e.g. scan with its own lifecycle).
  */
 export function createAdapter(puppeteerPage: Page): BrowserAdapter {
   const consoleLogs: string[] = [];

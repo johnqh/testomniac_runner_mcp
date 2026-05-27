@@ -1,9 +1,10 @@
 import { z } from "zod/v4";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { ensureBrowser, createAdapter } from "../browser-session.ts";
+import { getConfiguredApiClient } from "../api-config.ts";
+import { spawnRunner } from "../runner-process.ts";
 import {
   runTestRun,
-  getApiClient,
   createDefaultExpertises,
   SizeClass,
   type ScanEventHandler,
@@ -13,25 +14,26 @@ import {
 export function registerScanTools(server: McpServer) {
   server.tool(
     "run_full_scan",
-    "Execute a full Testomniac discovery scan on a URL. Launches browser, crawls pages, extracts elements, runs expertises, and records findings. Requires the Testomniac API to be running.",
+    "Execute a full Testomniac discovery scan in-process. Launches browser, crawls pages, extracts elements, runs expertises, and records findings. Requires the Testomniac API (set via set_api_key or environment variables).",
     {
       testRunId: z.number().describe("The test run ID (from the API)"),
       runnerId: z.number().describe("The runner ID (from the API)"),
+      baseUrl: z.string().describe("Base URL of the site to scan (e.g. https://example.com)"),
       sizeClass: z
         .enum(["desktop", "mobile"])
         .optional()
         .describe("Device class (default: desktop)"),
     },
-    async ({ testRunId, runnerId, sizeClass }) => {
-      const apiUrl = process.env["TESTOMNIAC_API_URL"];
-      const apiKey = process.env["TESTOMNIAC_API_KEY"];
-
-      if (!apiUrl || !apiKey) {
+    async ({ testRunId, runnerId, baseUrl, sizeClass }) => {
+      let api;
+      try {
+        api = getConfiguredApiClient();
+      } catch {
         return {
           content: [
             {
               type: "text",
-              text: "TESTOMNIAC_API_URL and TESTOMNIAC_API_KEY are required for full scans.",
+              text: "API not configured. Set TESTOMNIAC_API_URL and TESTOMNIAC_API_KEY environment variables, or use the set_api_key tool first.",
             },
           ],
           isError: true,
@@ -40,10 +42,10 @@ export function registerScanTools(server: McpServer) {
 
       const page = await ensureBrowser();
       const adapter = createAdapter(page);
-      const api = getApiClient(apiUrl, apiKey);
       const expertises = createDefaultExpertises();
 
       const events: string[] = [];
+      const personas: Array<{ id: number; title: string; description: string }> = [];
       const eventHandler: ScanEventHandler = {
         onPageFound: (p) => events.push(`Page found: ${p.relativePath}`),
         onPageStateCreated: (s) => events.push(`Page state created: ${s.pageStateId}`),
@@ -56,6 +58,10 @@ export function registerScanTools(server: McpServer) {
         onStatsUpdated: () => {},
         onScreenshotCaptured: () => {},
         onScanComplete: (s) => events.push(`Scan complete: ${s.totalPages} pages, ${s.totalFindings} findings`),
+        onPersonasDetected: (p) => {
+          personas.push(...p);
+          events.push(`Personas detected: ${p.map(x => x.title).join(", ")}`);
+        },
         onError: (e) => events.push(`Error: ${e.message}`),
       };
 
@@ -68,7 +74,7 @@ export function registerScanTools(server: McpServer) {
           {
             testRunId,
             runnerId,
-            baseUrl: apiUrl,
+            baseUrl,
             sizeClass: sizeClass === "mobile" ? SizeClass.Mobile : SizeClass.Desktop,
             runnerInstanceId: instanceId,
             runnerInstanceName: "mcp-runner",
@@ -100,10 +106,117 @@ export function registerScanTools(server: McpServer) {
         content: [
           {
             type: "text",
-            text: JSON.stringify({ result, events }, null, 2),
+            text: JSON.stringify({ result, events, personas }, null, 2),
           },
         ],
       };
+    }
+  );
+
+  server.tool(
+    "execute_run",
+    "Execute a test run locally using the bundled runner process. The runner spawns as a separate process with its own browser, executes the specific run, and exits. Use this for local development instead of relying on a server-side runner.",
+    {
+      runId: z.number().describe("Test run ID to execute"),
+      runnerId: z.number().describe("Runner ID"),
+      baseUrl: z.string().describe("Base URL of the site to test"),
+      sizeClass: z
+        .enum(["desktop", "mobile"])
+        .optional()
+        .describe("Device class (default: desktop)"),
+    },
+    async ({ runId, runnerId, baseUrl, sizeClass }) => {
+      const logs: string[] = [];
+      try {
+        const { done } = spawnRunner({
+          runId,
+          runnerId,
+          baseUrl,
+          sizeClass,
+          onStdout: line => logs.push(line),
+          onStderr: line => logs.push(`[err] ${line}`),
+        });
+        const { exitCode } = await done;
+        return {
+          content: [
+            {
+              type: "text",
+              text: JSON.stringify(
+                { exitCode, success: exitCode === 0, logs },
+                null,
+                2
+              ),
+            },
+          ],
+        };
+      } catch (err) {
+        return {
+          content: [
+            {
+              type: "text",
+              text: JSON.stringify(
+                {
+                  error: err instanceof Error ? err.message : String(err),
+                  logs,
+                },
+                null,
+                2
+              ),
+            },
+          ],
+          isError: true,
+        };
+      }
+    }
+  );
+
+  server.tool(
+    "execute_sequence",
+    "Execute a test sequence run locally using the bundled runner process. Spawns a runner that executes the ordered test interactions in the sequence and exits.",
+    {
+      sequenceRunId: z.number().describe("The sequence run ID to execute"),
+      runnerId: z.number().describe("Runner ID"),
+    },
+    async ({ sequenceRunId, runnerId }) => {
+      const logs: string[] = [];
+      try {
+        const { done } = spawnRunner({
+          sequenceRunId,
+          runnerId,
+          onStdout: line => logs.push(line),
+          onStderr: line => logs.push(`[err] ${line}`),
+        });
+        const { exitCode } = await done;
+        return {
+          content: [
+            {
+              type: "text",
+              text: JSON.stringify(
+                { exitCode, success: exitCode === 0, logs },
+                null,
+                2
+              ),
+            },
+          ],
+        };
+      } catch (err) {
+        return {
+          content: [
+            {
+              type: "text",
+              text: JSON.stringify(
+                {
+                  error: err instanceof Error ? err.message : String(err),
+                  logs,
+                },
+                null,
+                2
+              ),
+            },
+          ],
+          isError: true,
+        };
+      }
     }
   );
 }

@@ -1,16 +1,16 @@
 import { z } from "zod/v4";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { getPage, createAdapter } from "../browser-session.ts";
+import { getAdapter } from "../browser-session.ts";
 import {
   createDefaultExpertises,
   detectScaffoldRegions,
   type ExpertiseContext,
+  type BrowserAdapter,
 } from "@sudobility/testomniac_runner_service";
 
-async function buildMinimalContext(page: Awaited<ReturnType<typeof getPage>>): Promise<ExpertiseContext> {
-  const adapter = createAdapter(page);
-  const html = await page.content();
-  const url = page.url();
+async function buildMinimalContext(adapter: BrowserAdapter): Promise<ExpertiseContext> {
+  const html = await adapter.content();
+  const url = adapter.url();
   const scaffolds = await detectScaffoldRegions(adapter);
   const artifacts = adapter.getRuntimeArtifacts?.() ?? { consoleLogs: [], networkLogs: [] };
 
@@ -37,8 +37,8 @@ export function registerExpertiseTools(server: McpServer) {
     "Run all expertise evaluations on the current page. Best-effort: some checks require full test context and may be skipped. Returns findings from SEO, Security, Content, UI, Performance, and Accessibility modules.",
     {},
     async () => {
-      const page = await getPage();
-      const context = await buildMinimalContext(page);
+      const adapter = await getAdapter();
+      const context = await buildMinimalContext(adapter);
       const expertises = createDefaultExpertises();
 
       const allFindings: Array<{ expertise: string; findings: unknown[] }> = [];
@@ -70,8 +70,8 @@ export function registerExpertiseTools(server: McpServer) {
         .describe("Which expertise module to run"),
     },
     async ({ expertise: expertiseName }) => {
-      const page = await getPage();
-      const context = await buildMinimalContext(page);
+      const adapter = await getAdapter();
+      const context = await buildMinimalContext(adapter);
       const allExpertises = createDefaultExpertises();
       const selected = allExpertises.find((e) => e.name.toLowerCase().includes(expertiseName));
 

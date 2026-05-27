@@ -4,6 +4,8 @@ import {
   generateRenderTest,
   generateNavigationTest,
   generateE2ETest,
+  generateInteractionTest,
+  generateFormTest,
   SizeClass,
 } from "@sudobility/testomniac_runner_service";
 
@@ -78,6 +80,127 @@ export function registerTestGenerationTools(server: McpServer) {
       const test = generateE2ETest({
         sizeClass: sizeClass === "mobile" ? SizeClass.Mobile : SizeClass.Desktop,
         steps,
+      });
+      return {
+        content: [{ type: "text", text: JSON.stringify(test, null, 2) }],
+      };
+    }
+  );
+
+  server.tool(
+    "generate_interaction_test",
+    "Generate an element interaction test (click with optional preceding hovers)",
+    {
+      pageName: z.string().describe("Display name of the page"),
+      url: z.string().describe("URL of the page"),
+      clickSelector: z
+        .string()
+        .describe("CSS selector of the element to click"),
+      mouseoverSelectors: z
+        .array(z.string())
+        .optional()
+        .describe("CSS selectors to hover before clicking (in order)"),
+      expectedUrl: z
+        .string()
+        .optional()
+        .describe("Expected URL after the interaction"),
+      sizeClass: z
+        .enum(["desktop", "mobile"])
+        .optional()
+        .describe("Device class (default: desktop)"),
+      priority: z
+        .string()
+        .optional()
+        .describe("Priority level (default: medium)"),
+    },
+    async ({
+      pageName,
+      url,
+      clickSelector,
+      mouseoverSelectors,
+      expectedUrl,
+      sizeClass,
+      priority,
+    }) => {
+      const test = generateInteractionTest({
+        pageName,
+        url,
+        clickSelector,
+        mouseoverSelectors: mouseoverSelectors ?? [],
+        expectedUrl,
+        sizeClass:
+          sizeClass === "mobile" ? SizeClass.Mobile : SizeClass.Desktop,
+        priority: priority ?? "medium",
+      });
+      return {
+        content: [{ type: "text", text: JSON.stringify(test, null, 2) }],
+      };
+    }
+  );
+
+  server.tool(
+    "generate_form_test",
+    "Generate a form submission test with field fills and discrete controls",
+    {
+      pageName: z.string().describe("Display name of the page"),
+      url: z.string().describe("URL of the page"),
+      fills: z
+        .array(
+          z.object({
+            selector: z.string().describe("CSS selector of the input field"),
+            value: z.string().describe("Value to type into the field"),
+          })
+        )
+        .describe("Text fields to fill"),
+      discreteControls: z
+        .array(
+          z.object({
+            selector: z.string().describe("CSS selector of the control"),
+            type: z
+              .string()
+              .describe("Control type (checkbox, radio, select)"),
+            value: z.string().describe("Value to set"),
+          })
+        )
+        .optional()
+        .describe("Discrete controls: checkboxes, radios, selects"),
+      submitSelector: z
+        .string()
+        .optional()
+        .describe("CSS selector of the submit button"),
+      personaId: z.number().optional().describe("Persona ID (default: 0)"),
+      useCaseId: z.number().optional().describe("Use case ID (default: 0)"),
+      sizeClass: z
+        .enum(["desktop", "mobile"])
+        .optional()
+        .describe("Device class (default: desktop)"),
+      priority: z
+        .string()
+        .optional()
+        .describe("Priority level (default: medium)"),
+    },
+    async ({
+      pageName,
+      url,
+      fills,
+      discreteControls,
+      submitSelector,
+      personaId,
+      useCaseId,
+      sizeClass,
+      priority,
+    }) => {
+      const test = generateFormTest({
+        pageName,
+        url,
+        fills,
+        discreteControls: discreteControls ?? [],
+        submitSelector,
+        personaId: personaId ?? 0,
+        useCaseId: useCaseId ?? 0,
+        sizeClass:
+          sizeClass === "mobile" ? SizeClass.Mobile : SizeClass.Desktop,
+        priority: priority ?? "medium",
       });
       return {
         content: [{ type: "text", text: JSON.stringify(test, null, 2) }],

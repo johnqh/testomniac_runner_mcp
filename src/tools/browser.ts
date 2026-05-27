@@ -1,6 +1,6 @@
 import { z } from "zod/v4";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { ensureBrowser, getPage, closeBrowser, isBrowserActive, createAdapter } from "../browser-session.ts";
+import { ensureBrowser, getPage, closeBrowser, isBrowserActive, getAdapter } from "../browser-session.ts";
 
 export function registerBrowserTools(server: McpServer) {
   server.tool(
@@ -175,8 +175,7 @@ export function registerBrowserTools(server: McpServer) {
     "Get console and network logs from the current session",
     {},
     async () => {
-      const page = await getPage();
-      const adapter = createAdapter(page);
+      const adapter = await getAdapter();
       const artifacts = adapter.getRuntimeArtifacts?.();
       return {
         content: [
