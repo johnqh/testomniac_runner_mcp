@@ -8,10 +8,10 @@ import { resolve } from "path";
 import { getApiConfig } from "./api-config.ts";
 
 function getRunnerPath(): string {
-  // Resolve from node_modules (installed as file: dependency)
+  // Resolve from node_modules (installed as npm dependency)
   const candidates = [
-    resolve(import.meta.dir, "../node_modules/testomniac_runner/src/index.ts"),
-    resolve(import.meta.dir, "../node_modules/testomniac_runner/dist/index.js"),
+    resolve(import.meta.dir, "../node_modules/@sudobility/testomniac_runner/src/index.ts"),
+    resolve(import.meta.dir, "../node_modules/@sudobility/testomniac_runner/dist/index.js"),
   ];
   for (const p of candidates) {
     try {
@@ -21,7 +21,7 @@ function getRunnerPath(): string {
     }
   }
   throw new Error(
-    "testomniac_runner not found in node_modules. Run bun install."
+    "@sudobility/testomniac_runner not found in node_modules. Run bun install."
   );
 }
 
