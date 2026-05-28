@@ -1,6 +1,6 @@
 {
   "name": "@sudobility/testomniac_runner_mcp",
-  "version": "0.1.36",
+  "version": "0.1.37",
   "description": "MCP server for the Testomniac Runner - gives AI assistants browser control and test execution capabilities",
   "type": "module",
   "license": "BUSL-1.1",
@@ -22,8 +22,8 @@
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.29.0",
-    "@sudobility/testomniac_runner_service": "^0.1.124",
-    "@sudobility/testomniac_types": "^0.0.64",
+    "@sudobility/testomniac_runner_service": "^0.1.126",
+    "@sudobility/testomniac_types": "^0.0.66",
     "puppeteer": "^25.0.4",
     "testomniac_runner": "file:../testomniac_runner",
     "zod": "^4.4.3"
