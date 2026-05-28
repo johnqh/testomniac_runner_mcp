@@ -6,7 +6,7 @@
       "name": "testomniac_runner_mcp",
       "dependencies": {
         "@modelcontextprotocol/sdk": "^1.29.0",
-        "@sudobility/testomniac_runner_service": "^0.1.126",
+        "@sudobility/testomniac_runner_service": "^0.1.127",
         "@sudobility/testomniac_types": "^0.0.66",
         "puppeteer": "^25.0.4",
         "testomniac_runner": "file:../testomniac_runner",
@@ -161,7 +161,7 @@
 
     "@sudobility/signic_sdk": ["@sudobility/signic_sdk@0.1.7", "", {}, "sha512-5XSgHSVsmyrMQ/ui1nDywwzt9dbRCsaeJ5tX6mKw2ZXbTZ82OsMr+dqDyV9XV3pfy7IHRIZq73af5KBamx72Fw=="],
 
-    "@sudobility/testomniac_runner_service": ["@sudobility/testomniac_runner_service@0.1.126", "", { "peerDependencies": { "@sudobility/testomniac_types": "^0.0.66", "openai": ">=6.0.0", "react": ">=18.0.0" }, "optionalPeers": ["openai", "react"] }, "sha512-XU6uBJwNnbdXyPKisBXxkUl2wizGL4l4M+WFhwCXsoC9PX81ZQDJgDCNxkcp23yFjLTv7v+gfF+a2+Rluma+aQ=="],
+    "@sudobility/testomniac_runner_service": ["@sudobility/testomniac_runner_service@0.1.127", "", { "peerDependencies": { "@sudobility/testomniac_types": "^0.0.66", "openai": ">=6.0.0", "react": ">=18.0.0" }, "optionalPeers": ["openai", "react"] }, "sha512-H/zf41bhFyvd0JR9TZlqPDJksdlmdTCrmvuoRDBVrJ58Wk7ktVESYBs9DCTj6Spd6SOsanu+rK+3bNjrZorsfQ=="],
 
     "@sudobility/testomniac_types": ["@sudobility/testomniac_types@0.0.66", "", { "peerDependencies": { "@sudobility/types": "^1.9.62" } }, "sha512-2oGnWAX1QM2J5AsMYl89PiLALIg5TFZFkm0C7VQxnHkvH1mRUfyLNjnrX/3kCMn5SwwL1/ljXDUWb+FYXEW/qA=="],
 
