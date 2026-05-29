@@ -1,7 +1,7 @@
 import { z } from "zod/v4";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { ensureBrowser, createAdapter } from "../browser-session.ts";
-import { getConfiguredApiClient } from "../api-config.ts";
+import { getConfiguredApiClient, createDiscoveryRun } from "../api-config.ts";
 import { spawnRunner } from "../runner-process.ts";
 import {
   runTestRun,
@@ -16,8 +16,8 @@ export function registerScanTools(server: McpServer) {
     "run_full_scan",
     "Execute a full Testomniac discovery scan in-process. Launches browser, crawls pages, extracts elements, runs expertises, and records findings. Requires the Testomniac API (set via set_api_key or environment variables).",
     {
-      testRunId: z.number().describe("The test run ID (from the API)"),
-      runnerId: z.number().describe("The runner ID (from the API)"),
+      testRunId: z.number().optional().describe("The test run ID (from the API). If omitted, a new discovery run is created automatically."),
+      runnerId: z.number().optional().describe("The runner ID (from the API). If omitted, created automatically with the discovery run."),
       baseUrl: z.string().describe("Base URL of the site to scan (e.g. https://example.com)"),
       sizeClass: z
         .enum(["desktop", "mobile"])
@@ -25,6 +25,25 @@ export function registerScanTools(server: McpServer) {
         .describe("Device class (default: desktop)"),
     },
     async ({ testRunId, runnerId, baseUrl, sizeClass }) => {
+      // Auto-create discovery run if IDs not provided
+      if (testRunId == null || runnerId == null) {
+        try {
+          const discovery = await createDiscoveryRun(baseUrl);
+          testRunId = discovery.testRunId;
+          runnerId = discovery.runnerId;
+        } catch (err) {
+          return {
+            content: [
+              {
+                type: "text",
+                text: `Failed to create discovery run: ${err instanceof Error ? err.message : String(err)}`,
+              },
+            ],
+            isError: true,
+          };
+        }
+      }
+
       let api;
       try {
         api = getConfiguredApiClient();

@@ -1,10 +1,12 @@
 {
-  "testomniac-runner": {
-    "command": "bun",
-    "args": ["run", "${CLAUDE_PLUGIN_ROOT}/src/index.ts"],
-    "env": {
-      "TESTOMNIAC_API_URL": "http://localhost:8027",
-      "TESTOMNIAC_API_KEY": ""
+  "mcpServers": {
+    "testomniac-runner": {
+      "command": "bun",
+      "args": ["run", "/Users/johnhuang/projects/testomniac_runner_mcp/src/index.ts"],
+      "env": {
+        "TESTOMNIAC_API_URL": "http://localhost:8027",
+        "TESTOMNIAC_API_KEY": ""
+      }
     }
   }
 }
