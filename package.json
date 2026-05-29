@@ -1,6 +1,6 @@
 {
   "name": "@sudobility/testomniac_runner_mcp",
-  "version": "0.1.42",
+  "version": "0.1.43",
   "description": "MCP server for the Testomniac Runner - gives AI assistants browser control and test execution capabilities",
   "type": "module",
   "license": "BUSL-1.1",
