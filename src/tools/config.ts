@@ -5,18 +5,18 @@ import { setApiConfig, getApiConfig } from "../api-config.ts";
 export function registerConfigTools(server: McpServer) {
   server.tool(
     "set_api_key",
-    "Set the API key for connecting to the Testomniac API. Use a master key (shared with testomniac_api on the server) or a user-defined entity API key (for local development). Without this, the TESTOMNIAC_API_KEY environment variable is used.",
+    "Set and persist the user's Testomniac API key. The key is saved to .mcp.json so it survives restarts. Required before running scans.",
     {
       apiKey: z
         .string()
         .describe(
-          "The Testomniac API key — either a master key or an entity API key (tst_...)"
+          "The user's Testomniac entity API key (tst_...)"
         ),
       apiUrl: z
         .string()
         .optional()
         .describe(
-          "Override the Testomniac API URL (default: TESTOMNIAC_API_URL env var)"
+          "Override the Testomniac API URL (default: https://api.testomniac.com)"
         ),
     },
     async ({ apiKey, apiUrl }) => {
@@ -29,6 +29,7 @@ export function registerConfigTools(server: McpServer) {
             text: JSON.stringify(
               {
                 apiKeySet: true,
+                persisted: true,
                 apiUrl: config.apiUrl ?? "not configured",
               },
               null,

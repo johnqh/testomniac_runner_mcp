@@ -42,7 +42,7 @@ export function spawnRunner(options: RunnerProcessOptions): {
   const config = getApiConfig();
   if (!config.apiUrl || !config.apiKey) {
     throw new Error(
-      "API not configured. Set TESTOMNIAC_API_URL and TESTOMNIAC_API_KEY environment variables, or use the set_api_key tool."
+      "API not configured. Set TESTOMNIAC_API_URL and TESTOMNIAC_USER_API_KEY environment variables, or use the set_api_key tool."
     );
   }
 

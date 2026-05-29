@@ -4,8 +4,7 @@
       "command": "bun",
       "args": ["run", "/Users/johnhuang/projects/testomniac_runner_mcp/src/index.ts"],
       "env": {
-        "TESTOMNIAC_API_URL": "http://localhost:8027",
-        "TESTOMNIAC_API_KEY": ""
+        "TESTOMNIAC_USER_API_KEY": ""
       }
     }
   }

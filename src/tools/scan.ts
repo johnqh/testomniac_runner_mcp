@@ -5,10 +5,12 @@ import { getConfiguredApiClient, createDiscoveryRun } from "../api-config.ts";
 import { spawnRunner } from "../runner-process.ts";
 import {
   runTestRun,
+  runSequenceRun,
   createDefaultExpertises,
   SizeClass,
   type ScanEventHandler,
   type ScanResult,
+  type SequenceRunResult,
 } from "@sudobility/testomniac_runner_service";
 
 export function registerScanTools(server: McpServer) {
@@ -52,7 +54,7 @@ export function registerScanTools(server: McpServer) {
           content: [
             {
               type: "text",
-              text: "API not configured. Set TESTOMNIAC_API_URL and TESTOMNIAC_API_KEY environment variables, or use the set_api_key tool first.",
+              text: "API not configured. Set TESTOMNIAC_API_URL and TESTOMNIAC_USER_API_KEY environment variables, or use the set_api_key tool first.",
             },
           ],
           isError: true,
@@ -126,6 +128,108 @@ export function registerScanTools(server: McpServer) {
           {
             type: "text",
             text: JSON.stringify({ result, events, personas }, null, 2),
+          },
+        ],
+      };
+    }
+  );
+
+  server.tool(
+    "run_sequence",
+    "Execute a test scenario sequence in-process using the active browser session. Runs each pre-defined interaction step in order. After completion, the browser remains on the final page so you can inspect state, determine if the flow goal was reached, and continue with additional interactions if needed.",
+    {
+      sequenceRunId: z.number().describe("The sequence run ID to execute"),
+      runnerId: z.number().describe("Runner ID"),
+      sizeClass: z
+        .enum(["desktop", "mobile"])
+        .optional()
+        .describe("Device class (default: desktop)"),
+    },
+    async ({ sequenceRunId, runnerId, sizeClass }) => {
+      let api;
+      try {
+        api = getConfiguredApiClient();
+      } catch {
+        return {
+          content: [
+            {
+              type: "text",
+              text: "API not configured. Set TESTOMNIAC_API_URL and TESTOMNIAC_USER_API_KEY environment variables, or use the set_api_key tool first.",
+            },
+          ],
+          isError: true,
+        };
+      }
+
+      const page = await ensureBrowser();
+      const adapter = createAdapter(page);
+      const expertises = createDefaultExpertises();
+
+      const events: string[] = [];
+      const eventHandler: ScanEventHandler = {
+        onPageFound: (p) => events.push(`Page found: ${p.relativePath}`),
+        onPageStateCreated: (s) => events.push(`Page state created: ${s.pageStateId}`),
+        onTestSurfaceCreated: (s) => events.push(`Surface created: ${s.title}`),
+        onTestInteractionRunCompleted: (r) =>
+          events.push(`Step ${r.testInteractionRunId}: ${r.passed ? "PASS" : "FAIL"}`),
+        onTestRunCompleted: (r) =>
+          events.push(`Test run ${r.testRunId}: ${r.passed ? "PASS" : "FAIL"}`),
+        onFindingCreated: (f) => events.push(`Finding [${f.type}]: ${f.title}`),
+        onStatsUpdated: () => {},
+        onScreenshotCaptured: () => {},
+        onScanComplete: () => {},
+        onError: (e) => events.push(`Error: ${e.message}`),
+      };
+
+      let result: SequenceRunResult;
+      try {
+        result = await runSequenceRun(
+          adapter,
+          {
+            sequenceRunId,
+            runnerId,
+            runnerInstanceId: crypto.randomUUID(),
+            runnerInstanceName: "mcp-runner",
+            sizeClass: sizeClass === "mobile" ? SizeClass.Mobile : SizeClass.Desktop,
+          },
+          api,
+          expertises,
+          eventHandler
+        );
+      } catch (err) {
+        return {
+          content: [
+            {
+              type: "text",
+              text: JSON.stringify(
+                {
+                  error: err instanceof Error ? err.message : String(err),
+                  currentUrl: page.url(),
+                  events,
+                },
+                null,
+                2
+              ),
+            },
+          ],
+          isError: true,
+        };
+      }
+
+      return {
+        content: [
+          {
+            type: "text",
+            text: JSON.stringify(
+              {
+                ...result,
+                currentUrl: page.url(),
+                allStepsPassed: result.interactionsFailed === 0,
+                events,
+              },
+              null,
+              2
+            ),
           },
         ],
       };

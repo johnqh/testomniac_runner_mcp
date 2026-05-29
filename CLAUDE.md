@@ -59,16 +59,16 @@ src/
 |----------|----------|-------------|
 | `CHROMIUM_PATH` | No | Override path to Chromium (default: uses bundled Chromium from puppeteer) |
 | `TESTOMNIAC_API_URL` | For scans | Base URL of the Testomniac API (overridable via `set_api_key`) |
-| `TESTOMNIAC_API_KEY` | For scans | API key — master key (server) or entity key (local dev, overridable via `set_api_key`) |
+| `TESTOMNIAC_USER_API_KEY` | For scans | API key — master key (server) or entity key (local dev, overridable via `set_api_key`) |
 
 ## API Key Configuration
 
 Two types of API keys are supported:
 
-1. **Master API key** — Shared between `testomniac_runner` and `testomniac_api` on the server. Set via `TESTOMNIAC_API_KEY` environment variable.
+1. **Master API key** — Shared between `testomniac_runner` and `testomniac_api` on the server. Set via `TESTOMNIAC_USER_API_KEY` environment variable.
 2. **Entity API key** — User-defined key associated with an entity in `testomniac_api`. For local development, set at runtime using the `set_api_key` tool.
 
-When no key is provided via `set_api_key`, the `TESTOMNIAC_API_KEY` environment variable is used as the default.
+When no key is provided via `set_api_key`, the `TESTOMNIAC_USER_API_KEY` environment variable is used as the default.
 
 ## Tools (28)
 
@@ -124,7 +124,7 @@ Add to `.claude/settings.json`:
       "args": ["run", "/path/to/testomniac_runner_mcp/src/index.ts"],
       "env": {
         "TESTOMNIAC_API_URL": "http://localhost:8027",
-        "TESTOMNIAC_API_KEY": "your-scanner-key"
+        "TESTOMNIAC_USER_API_KEY": "your-scanner-key"
       }
     }
   }

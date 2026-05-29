@@ -2,18 +2,39 @@
  * Centralized API configuration.
  * Supports runtime override via set_api_key tool,
  * falls back to environment variables.
+ * Persists the API key to .mcp.json so it survives restarts.
  */
 
+import { readFileSync, writeFileSync } from "node:fs";
+import { resolve } from "node:path";
 import { ApiClient } from "@sudobility/testomniac_runner_service";
 
-let apiUrl: string | undefined = process.env["TESTOMNIAC_API_URL"];
-let apiKey: string | undefined = process.env["TESTOMNIAC_API_KEY"];
+const mcpJsonPath = resolve(import.meta.dir, "../.mcp.json");
+
+let apiUrl: string | undefined =
+  process.env["TESTOMNIAC_API_URL"] || "https://api.testomniac.com";
+let apiKey: string | undefined = process.env["TESTOMNIAC_USER_API_KEY"];
 let client: ApiClient | null = null;
 
 export function setApiConfig(config: { apiUrl?: string; apiKey?: string }) {
   if (config.apiUrl !== undefined) apiUrl = config.apiUrl;
   if (config.apiKey !== undefined) apiKey = config.apiKey;
   client = null; // force re-creation with new config
+  persistToMcpJson();
+}
+
+function persistToMcpJson() {
+  try {
+    const raw = readFileSync(mcpJsonPath, "utf-8");
+    const mcp = JSON.parse(raw);
+    const server = mcp.mcpServers?.["testomniac-runner"];
+    if (!server) return;
+    if (!server.env) server.env = {};
+    if (apiKey !== undefined) server.env.TESTOMNIAC_USER_API_KEY = apiKey;
+    writeFileSync(mcpJsonPath, JSON.stringify(mcp, null, 2) + "\n");
+  } catch {
+    // non-fatal — key still works in memory for this session
+  }
 }
 
 export function getApiConfig(): {
@@ -69,7 +90,7 @@ export async function createDiscoveryRun(baseUrl: string): Promise<{
 export function getConfiguredApiClient(): ApiClient {
   if (!apiUrl || !apiKey) {
     throw new Error(
-      "API not configured. Set TESTOMNIAC_API_URL and TESTOMNIAC_API_KEY environment variables, or use the set_api_key tool."
+      "API not configured. Set TESTOMNIAC_API_URL and TESTOMNIAC_USER_API_KEY environment variables, or use the set_api_key tool."
     );
   }
   if (!client) {

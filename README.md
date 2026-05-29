@@ -64,7 +64,7 @@ Add to your Claude Code settings (`~/.claude/settings.json` for global, or `.cla
       "args": ["run", "/absolute/path/to/testomniac_runner_mcp/src/index.ts"],
       "env": {
         "TESTOMNIAC_API_URL": "http://localhost:8027",
-        "TESTOMNIAC_API_KEY": ""
+        "TESTOMNIAC_USER_API_KEY": ""
       }
     }
   }
@@ -85,7 +85,7 @@ Add to your Claude Desktop config (`~/Library/Application Support/Claude/claude_
       "args": ["run", "/absolute/path/to/testomniac_runner_mcp/src/index.ts"],
       "env": {
         "TESTOMNIAC_API_URL": "http://localhost:8027",
-        "TESTOMNIAC_API_KEY": ""
+        "TESTOMNIAC_USER_API_KEY": ""
       }
     }
   }
@@ -100,12 +100,12 @@ There are two types of API keys:
 
 | Key Type | When to Use | How to Set |
 |----------|-------------|------------|
-| **Master key** | Server deployments where the runner and API share a secret | Set `TESTOMNIAC_API_KEY` environment variable |
+| **Master key** | Server deployments where the runner and API share a secret | Set `TESTOMNIAC_USER_API_KEY` environment variable |
 | **Entity key** | Local development with a user-specific key (`tst_...`) | Use the `set_api_key` tool at runtime |
 
 ### Setting the key via environment variable
 
-Set `TESTOMNIAC_API_KEY` in the `env` block of your MCP server config (see setup sections above). This is the default — if set, it's used automatically.
+Set `TESTOMNIAC_USER_API_KEY` in the `env` block of your MCP server config (see setup sections above). This is the default — if set, it's used automatically.
 
 ### Setting the key at runtime
 
@@ -135,7 +135,7 @@ The full key is only shown once at creation time.
 | Variable | Required | Description |
 |----------|----------|-------------|
 | `TESTOMNIAC_API_URL` | For scans | Base URL of the Testomniac API (e.g. `http://localhost:8027`) |
-| `TESTOMNIAC_API_KEY` | For scans | Master key or entity key. Overridable at runtime via `set_api_key` |
+| `TESTOMNIAC_USER_API_KEY` | For scans | Master key or entity key. Overridable at runtime via `set_api_key` |
 | `CHROMIUM_PATH` | No | Override path to Chromium binary (default: bundled by Puppeteer) |
 
 ## Usage
@@ -353,7 +353,7 @@ Puppeteer bundles Chromium automatically. If it fails:
 ### "API not configured" error
 
 This means no API key is set. Either:
-1. Set `TESTOMNIAC_API_KEY` in the MCP server's env config
+1. Set `TESTOMNIAC_USER_API_KEY` in the MCP server's env config
 2. Call the `set_api_key` tool at runtime
 
 Browser-only tools (launch, navigate, screenshot, health check, etc.) work without an API key. Only `run_full_scan` requires one.

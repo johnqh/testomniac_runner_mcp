@@ -12,15 +12,16 @@ expertise evaluation, and scenario testing tools.
 
 This skill uses tools from **two** MCP servers:
 
-- **testomniac-runner** — Browser control, page analysis, expertises
-  (browser_launch, browser_navigate, browser_screenshot, evaluate_page_health,
-  extract_actionable_items, extract_forms, detect_login_page, detect_scaffolds,
-  decompose_page, run_all_expertises, run_expertise, run_full_scan, set_api_key)
-- **testomniac-api** — Scans, scenarios, sequences, personas
+- **testomniac-runner** — Browser control, page analysis, expertises, execution
+  (browser_launch, browser_navigate, browser_click, browser_type,
+  browser_screenshot, evaluate_page_health, extract_actionable_items,
+  extract_forms, detect_login_page, detect_scaffolds, decompose_page,
+  run_all_expertises, run_expertise, run_full_scan, run_sequence, set_api_key)
+- **testomniac-api** — Scans, scenarios, sequences, personas, finding details
   (start_scan, get_run_status, get_run_summary, list_run_findings,
-  list_run_pages, create_scenario, list_scenarios, detect_personas,
-  list_personas, generate_sequence, run_sequence, get_sequence_run,
-  list_products, get_product, list_environments)
+  get_finding_detail, list_run_pages, create_scenario, list_scenarios,
+  detect_personas, list_personas, generate_sequence, run_sequence,
+  get_sequence_run, list_products, get_product, list_environments)
 
 If the API MCP tools are not available, say so and offer browser-only
 testing (Flow A only).
@@ -226,31 +227,91 @@ discovered yet, tell the user and offer to run a scan first (Flow C).
 >
 > Ready to run this sequence?
 
-### Step 6: Run the Sequence
+### Step 6: Run the Sequence with Self-Healing
 
-**For local development** (recommended — runs on the developer's machine):
+1. Call `browser_launch` if not already open.
+2. Call `run_sequence` (testomniac-runner MCP) with the sequence run ID
+   and runner ID. This executes the pre-defined steps in-process using
+   the active browser session.
+3. After `run_sequence` completes, check the result:
+   - `allStepsPassed: true` means all pre-defined steps succeeded.
+   - `interactionsFailed > 0` means some steps failed.
+   - In **both cases**, the flow may not be complete — the sequence
+     may not cover the full user journey.
 
-1. Call `run_sequence` with the sequence ID to create the run record.
-2. Call `execute_sequence` with the sequence run ID and runner ID.
-   This spawns the bundled runner locally.
-3. After completion, call `list_run_findings` for any issues found.
+### Step 7: Self-Healing Loop
 
-**For remote execution** (server-side runner picks it up):
+After the sequence finishes (or partially fails), determine if the
+**flow goal** has been reached. The goal is derived from the scenario
+prompt (e.g., "complete the purchase" means we should see a
+confirmation/thank-you page).
 
-1. Call `run_sequence` with the sequence ID.
-2. Poll `get_sequence_run` every 10 seconds until status is
-   `completed` or `failed`. Show progress updates.
-3. After completion, call `list_run_findings` for any issues found.
+**Loop (max 10 iterations):**
 
-4. Report results:
+1. Call `browser_screenshot` to see the current page state.
+2. Call `extract_actionable_items` to see available interactions.
+3. **Evaluate**: Based on the scenario prompt and the current page
+   state (screenshot + URL + available elements), determine:
+   - **Goal reached?** → Exit loop, report success.
+   - **Stuck/error page?** → Report failure with what went wrong.
+   - **More steps needed?** → Continue to step 4.
+4. **Decide next action**: Pick the most logical next interaction to
+   advance the flow toward the goal. Consider:
+   - Buttons with text like "Continue", "Next", "Submit", "Checkout"
+   - Form fields that need filling
+   - Navigation links that lead toward the goal
+   - Modals/dialogs that need dismissal
+5. **Execute the action**:
+   - For clicks: `browser_click` with the element selector
+   - For text input: `browser_type` with appropriate values
+   - For navigation: `browser_navigate` if needed
+6. Wait briefly for the page to settle, then go back to step 1.
+
+**Exit conditions:**
+- Goal reached (success)
+- Same page state detected twice in a row (stuck)
+- Error page or unrecoverable state detected
+- Max iterations (10) reached
+
+### Step 8: Report Results and Findings
+
+After the loop completes:
+
+1. Call `list_run_findings` to get all findings created during execution.
+2. For each finding, explain what it means and suggest a fix using
+   the `finding-fixes.md` reference.
+
+**Report format:**
 
 > **Scenario Test Complete: {title}**
 >
 > Status: {PASS/FAIL}
-> Steps executed: {N}
-> Findings: {M}
+> Pre-defined steps: {N} ({passed}/{failed})
+> Self-healing steps: {M} additional interactions
 >
-> {List findings if any}
+> **Flow summary:**
+> 1. {what happened at each major step}
+> 2. ...
+>
+> {If failed: explain where the flow got stuck and why}
+> {If passed: confirm the goal was reached}
+>
+> **Findings ({F}):**
+> - [{severity}] {title}: {description}
+>   - **Page:** {path where it occurred}
+>   - **Why it matters:** {explanation}
+>   - **Fix:** {suggested fix}
+> - ...
+>
+> {If no findings: "No issues found during this flow."}
+
+Always report findings even if the flow succeeded — issues like
+console errors, slow responses, or accessibility problems can occur
+during an otherwise passing flow.
+
+### Step 8b: Cleanup
+
+Always call `browser_close` when done.
 
 ---
 
@@ -271,13 +332,16 @@ discovered yet, tell the user and offer to run a scan first (Flow C).
    or `failed`. Show progress:
    > "Scanning... {pages} pages found, {findings} findings so far"
 
-### Step 8: Report Scan Results and Personas
+### Step 8: Report Scan Results, Findings, and Personas
 
 1. Call `get_run_summary` for aggregated results.
 2. Call `list_run_findings` for all findings.
 3. Call `list_run_pages` for discovered pages.
 4. Call `list_personas` to get detected personas (auto-generated
    after scan completes).
+
+For each finding, explain what it means and suggest a fix using
+the `finding-fixes.md` reference.
 
 **Report format:**
 
@@ -293,9 +357,12 @@ discovered yet, tell the user and offer to run a scan first (Flow C).
 > - Security: {count}
 > - ...
 >
-> **Top issues:**
-> 1. [severity] {title} on {path}
-> 2. ...
+> **All findings:**
+> - [{severity}] {title}: {description}
+>   - **Page:** {path where it occurred}
+>   - **Why it matters:** {explanation}
+>   - **Fix:** {suggested fix}
+> - ...
 >
 > **Personas detected:**
 > - **{persona title}**: {description}
@@ -315,6 +382,51 @@ If the user asks to test multiple pages without a full scan:
 2. For each page: navigate, evaluate health, collect results.
 3. Report all results together.
 4. Close browser once at the end.
+
+## Finding Detail Drilldown
+
+After reporting findings (in any flow), always offer:
+
+> "Want details on any of these findings? I can show the full context
+> and a Playwright script to reproduce it."
+
+When the user asks about a specific finding (by number, title, or
+description):
+
+1. Call `get_finding_detail` (testomniac-api) with the finding ID.
+2. The response includes:
+   - `finding` — full details (title, description, type, priority, path)
+   - `interaction` — the test interaction that triggered it
+   - `dependencyChain` — all prerequisite interactions in execution order
+   - `playwrightScript` — a complete, ready-to-run Playwright test
+
+3. Report the finding detail:
+
+> **Finding: {title}**
+>
+> **Description:** {description}
+> **Severity:** {type} (priority {priority})
+> **Page:** {path}
+>
+> **What happened:** {explain in plain language what the test did and
+> what went wrong, based on the interaction title and finding description}
+>
+> **Reproduction steps:**
+> {Number each interaction in the dependency chain}
+> 1. {dependency interaction 1 title}
+> 2. {dependency interaction 2 title}
+> 3. {the interaction that found the issue}
+>
+> **Playwright script to reproduce:**
+> ```typescript
+> {playwrightScript}
+> ```
+>
+> You can run this with `npx playwright test` or paste it into
+> Playwright's UI mode (`npx playwright test --ui`).
+
+If the user asks to run the Playwright script directly, use
+`browser_evaluate` or the Playwright MCP tools if available.
 
 ## Re-verification
 
