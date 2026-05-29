@@ -23,8 +23,10 @@ This skill uses tools from **two** MCP servers:
   detect_personas, list_personas, generate_sequence, run_sequence,
   get_sequence_run, list_products, get_product, list_environments)
 
-If the API MCP tools are not available, say so and offer browser-only
-testing (Flow A only).
+Both MCP servers work together. The testomniac-runner MCP handles
+browser control and runs scans locally via `run_full_scan`, which
+requires an API key to store results. Always check that the API key
+is configured before proceeding with any flow.
 
 ## Prerequisites: Check Before Doing Anything
 
@@ -43,13 +45,14 @@ If the user did not provide a URL:
 
 Do NOT proceed without a URL.
 
-### 2. Check API Key (for Flows B and C)
+### 2. Check API Key (required for all flows)
 
-Flows B (Scenario Test) and C (Full Scan) require the Testomniac API.
-Before attempting any API tool call, check if the API is configured.
+All flows require a Testomniac API key. The API key is needed to
+store scan results, manage findings, and run test sequences.
 
-Try calling `list_products` or another lightweight API tool. If it
-fails with an auth error or "API not configured":
+Before proceeding, call `set_api_key` with no arguments (or call
+`browser_status`) to check if the API is already configured. If the
+API key is not set:
 
 > "I need a Testomniac API key to run scans and test scenarios.
 >
@@ -92,11 +95,13 @@ Match the user's request to one of three flows:
 | "test it as a shopper", "add to cart and check out", "test the login flow" | **Flow B: Scenario Test** |
 | "do a complete scan", "full scan", "scan my site" | **Flow C: Full Scan** |
 
-If unclear, default to Flow A and offer the other flows afterward.
+If the request includes "scan" in any form, use Flow C — never
+downgrade to Flow A. If unclear and the request is not a scan,
+default to Flow A and offer the other flows afterward.
 
 ---
 
-## Flow A: Quick Check (no API key needed)
+## Flow A: Quick Check
 
 ### Step 1: Launch and Navigate
 
