@@ -2,9 +2,12 @@
   "mcpServers": {
     "testomniac-runner": {
       "command": "bun",
-      "args": ["run", "/Users/johnhuang/projects/testomniac_runner_mcp/src/index.ts"],
+      "args": [
+        "run",
+        "/Users/johnhuang/projects/testomniac_runner_mcp/src/index.ts"
+      ],
       "env": {
-        "TESTOMNIAC_USER_API_KEY": ""
+        "TESTOMNIAC_USER_API_KEY": "tst_8bbac6f535cd2904944011b4f3568a85d14dd1c8a0e593f8"
       }
     }
   }

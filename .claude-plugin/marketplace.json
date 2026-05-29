@@ -1,0 +1,15 @@
+{
+  "name": "testomniac",
+  "owner": {
+    "name": "Sudobility",
+    "email": "support@sudobility.com"
+  },
+  "plugins": [
+    {
+      "name": "testomniac",
+      "description": "Web app testing — browser automation, page analysis, expertise evaluation, and health checks via Testomniac",
+      "category": "testing",
+      "source": "./"
+    }
+  ]
+}
