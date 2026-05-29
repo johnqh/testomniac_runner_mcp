@@ -31,6 +31,7 @@ export interface RunnerProcessOptions {
   runnerId: number;
   baseUrl?: string;
   sizeClass?: string;
+  scanMode?: "full" | "partial" | "minimum";
   onStdout?: (line: string) => void;
   onStderr?: (line: string) => void;
 }
@@ -54,6 +55,7 @@ export function spawnRunner(options: RunnerProcessOptions): {
     args.push("--runner-id", String(options.runnerId));
     if (options.baseUrl) args.push("--base-url", options.baseUrl);
     if (options.sizeClass) args.push("--size-class", options.sizeClass);
+    if (options.scanMode) args.push("--scan-mode", options.scanMode);
   } else if (options.sequenceRunId) {
     args.push("--sequence-run-id", String(options.sequenceRunId));
     args.push("--runner-id", String(options.runnerId));

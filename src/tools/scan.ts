@@ -1,26 +1,103 @@
 import { z } from "zod/v4";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { ensureBrowser, createAdapter } from "../browser-session.ts";
-import { getConfiguredApiClient, createDiscoveryRun } from "../api-config.ts";
-import { spawnRunner } from "../runner-process.ts";
 import {
-  runTestRun,
+  getConfiguredApiClient,
+  createDiscoveryRun,
+  getApiConfig,
+} from "../api-config.ts";
+import { spawnRunner } from "../runner-process.ts";
+import { ensureRunnerDaemon } from "../runner-daemon.ts";
+import {
   runSequenceRun,
   createDefaultExpertises,
   SizeClass,
   type ScanEventHandler,
-  type ScanResult,
   type SequenceRunResult,
 } from "@sudobility/testomniac_runner_service";
+
+const POLL_INTERVAL_MS = 3_000;
+const POLL_TIMEOUT_MS = 10 * 60_000; // 10 minutes
+
+function log(msg: string) {
+  console.error(`[testomniac] ${msg}`);
+}
+
+interface TestRunStatus {
+  id: number;
+  status: string;
+  pagesFound: number | null;
+  pageStatesFound: number | null;
+  testRunsCompleted: number | null;
+  totalDurationMs: number | null;
+  scanUrl: string | null;
+}
+
+async function pollTestRun(
+  testRunId: number
+): Promise<TestRunStatus> {
+  const { apiUrl, apiKey } = getApiConfig();
+  if (!apiUrl || !apiKey) throw new Error("API not configured");
+
+  const headers: Record<string, string> = {
+    "X-Scanner-Key": apiKey,
+  };
+
+  const start = Date.now();
+  let lastPagesFound = 0;
+  let lastTestRunsCompleted = 0;
+
+  while (Date.now() - start < POLL_TIMEOUT_MS) {
+    const res = await fetch(`${apiUrl}/api/v1/scanner/test-runs/${testRunId}`, {
+      headers,
+      cache: "no-store",
+    });
+    const json = (await res.json()) as {
+      success: boolean;
+      data?: TestRunStatus;
+      error?: string;
+    };
+
+    if (!json.success || !json.data) {
+      throw new Error(
+        `Failed to poll test run: ${json.error ?? res.statusText}`
+      );
+    }
+
+    const run = json.data;
+
+    // Log progress when it changes
+    const pages = run.pagesFound ?? 0;
+    const completed = run.testRunsCompleted ?? 0;
+    if (pages !== lastPagesFound || completed !== lastTestRunsCompleted) {
+      log(
+        `Run ${testRunId}: ${run.status} — ${pages} pages, ${completed} interactions completed`
+      );
+      lastPagesFound = pages;
+      lastTestRunsCompleted = completed;
+    }
+
+    if (run.status === "completed" || run.status === "failed") {
+      log(
+        `Run ${testRunId}: ${run.status} in ${run.totalDurationMs ?? Date.now() - start}ms — ${pages} pages found`
+      );
+      return run;
+    }
+
+    await new Promise((r) => setTimeout(r, POLL_INTERVAL_MS));
+  }
+
+  throw new Error(`Scan timed out after ${POLL_TIMEOUT_MS / 1000}s`);
+}
 
 export function registerScanTools(server: McpServer) {
   server.tool(
     "run_full_scan",
-    "Execute a full Testomniac discovery scan in-process. Launches browser, crawls pages, extracts elements, runs expertises, and records findings. Requires the Testomniac API (set via set_api_key or environment variables).",
+    "Create a Testomniac discovery scan via the API. A separate runner process picks up the scan and executes it. This tool polls until the run completes and returns results. Requires the Testomniac API (set via set_api_key or environment variables).",
     {
-      testRunId: z.number().optional().describe("The test run ID (from the API). If omitted, a new discovery run is created automatically."),
-      runnerId: z.number().optional().describe("The runner ID (from the API). If omitted, created automatically with the discovery run."),
-      baseUrl: z.string().describe("Base URL of the site to scan (e.g. https://example.com)"),
+      baseUrl: z
+        .string()
+        .describe("Base URL of the site to scan (e.g. https://example.com)"),
       sizeClass: z
         .enum(["desktop", "mobile"])
         .optional()
@@ -28,87 +105,76 @@ export function registerScanTools(server: McpServer) {
       scanMode: z
         .enum(["full", "partial", "minimum"])
         .optional()
-        .describe("Scan depth: 'full' runs all interactions (default), 'partial' skips redundant hover tests, 'minimum' only navigates pages without interaction testing"),
+        .describe(
+          "Scan depth: 'full' runs all interactions (default), 'partial' skips redundant hover tests, 'minimum' only navigates pages without interaction testing"
+        ),
     },
-    async ({ testRunId, runnerId, baseUrl, sizeClass, scanMode }) => {
-      // Auto-create discovery run if IDs not provided
-      if (testRunId == null || runnerId == null) {
-        try {
-          const discovery = await createDiscoveryRun(baseUrl);
-          testRunId = discovery.testRunId;
-          runnerId = discovery.runnerId;
-        } catch (err) {
-          return {
-            content: [
-              {
-                type: "text",
-                text: `Failed to create discovery run: ${err instanceof Error ? err.message : String(err)}`,
-              },
-            ],
-            isError: true,
-          };
-        }
-      }
-
-      let api;
+    async ({ baseUrl, sizeClass, scanMode }) => {
+      // Step 1: Create discovery run via API
+      let discovery;
       try {
-        api = getConfiguredApiClient();
-      } catch {
+        log(`Creating discovery scan for ${baseUrl}...`);
+        discovery = await createDiscoveryRun(baseUrl, {
+          sizeClass,
+          scanMode: scanMode ?? "full",
+        });
+        log(
+          `Scan created: testRunId=${discovery.testRunId}, runnerId=${discovery.runnerId}`
+        );
+      } catch (err) {
         return {
           content: [
             {
               type: "text",
-              text: "API not configured. Set TESTOMNIAC_API_URL and TESTOMNIAC_USER_API_KEY environment variables, or use the set_api_key tool first.",
+              text: `Failed to create discovery run: ${err instanceof Error ? err.message : String(err)}`,
             },
           ],
           isError: true,
         };
       }
 
-      const page = await ensureBrowser();
-      const adapter = createAdapter(page);
-      const expertises = createDefaultExpertises();
-
-      const events: string[] = [];
-      const personas: Array<{ id: number; title: string; description: string }> = [];
-      const eventHandler: ScanEventHandler = {
-        onPageFound: (p) => events.push(`Page found: ${p.relativePath}`),
-        onPageStateCreated: (s) => events.push(`Page state created: ${s.pageStateId}`),
-        onTestSurfaceCreated: (s) => events.push(`Surface created: ${s.title}`),
-        onTestInteractionRunCompleted: (r) =>
-          events.push(`Interaction run ${r.testInteractionRunId}: ${r.passed ? "PASS" : "FAIL"}`),
-        onTestRunCompleted: (r) =>
-          events.push(`Test run ${r.testRunId}: ${r.passed ? "PASS" : "FAIL"}`),
-        onFindingCreated: (f) => events.push(`Finding [${f.type}]: ${f.title}`),
-        onStatsUpdated: () => {},
-        onScreenshotCaptured: () => {},
-        onScanComplete: (s) => events.push(`Scan complete: ${s.totalPages} pages, ${s.totalFindings} findings`),
-        onPersonasDetected: (p) => {
-          personas.push(...p);
-          events.push(`Personas detected: ${p.map(x => x.title).join(", ")}`);
-        },
-        onError: (e) => events.push(`Error: ${e.message}`),
-      };
-
-      const instanceId = crypto.randomUUID();
-
-      let result: ScanResult;
+      // Step 2: Ensure runner daemon is running
       try {
-        result = await runTestRun(
-          adapter,
-          {
-            testRunId,
-            runnerId,
-            baseUrl,
-            sizeClass: sizeClass === "mobile" ? SizeClass.Mobile : SizeClass.Desktop,
-            scanMode: scanMode ?? "full",
-            runnerInstanceId: instanceId,
-            runnerInstanceName: "mcp-runner",
-          },
-          api,
-          expertises,
-          eventHandler
-        );
+        ensureRunnerDaemon();
+      } catch (err) {
+        return {
+          content: [
+            {
+              type: "text",
+              text: `Failed to start runner: ${err instanceof Error ? err.message : String(err)}`,
+            },
+          ],
+          isError: true,
+        };
+      }
+
+      // Step 3: Poll until the runner picks it up and completes
+      try {
+        log("Waiting for runner to pick up the scan...");
+        const run = await pollTestRun(discovery.testRunId);
+
+        return {
+          content: [
+            {
+              type: "text",
+              text: JSON.stringify(
+                {
+                  testRunId: discovery.testRunId,
+                  runnerId: discovery.runnerId,
+                  productId: discovery.productId,
+                  testEnvironmentId: discovery.testEnvironmentId,
+                  status: run.status,
+                  pagesFound: run.pagesFound ?? 0,
+                  pageStatesFound: run.pageStatesFound ?? 0,
+                  testRunsCompleted: run.testRunsCompleted ?? 0,
+                  totalDurationMs: run.totalDurationMs,
+                },
+                null,
+                2
+              ),
+            },
+          ],
+        };
       } catch (err) {
         return {
           content: [
@@ -117,7 +183,8 @@ export function registerScanTools(server: McpServer) {
               text: JSON.stringify(
                 {
                   error: err instanceof Error ? err.message : String(err),
-                  events,
+                  testRunId: discovery.testRunId,
+                  runnerId: discovery.runnerId,
                 },
                 null,
                 2
@@ -127,15 +194,6 @@ export function registerScanTools(server: McpServer) {
           isError: true,
         };
       }
-
-      return {
-        content: [
-          {
-            type: "text",
-            text: JSON.stringify({ result, events, personas }, null, 2),
-          },
-        ],
-      };
     }
   );
 
@@ -252,8 +310,12 @@ export function registerScanTools(server: McpServer) {
         .enum(["desktop", "mobile"])
         .optional()
         .describe("Device class (default: desktop)"),
+      scanMode: z
+        .enum(["full", "partial", "minimum"])
+        .optional()
+        .describe("Scan depth to pass to the local runner for this run"),
     },
-    async ({ runId, runnerId, baseUrl, sizeClass }) => {
+    async ({ runId, runnerId, baseUrl, sizeClass, scanMode }) => {
       const logs: string[] = [];
       try {
         const { done } = spawnRunner({
@@ -261,6 +323,7 @@ export function registerScanTools(server: McpServer) {
           runnerId,
           baseUrl,
           sizeClass,
+          scanMode,
           onStdout: line => logs.push(line),
           onStderr: line => logs.push(`[err] ${line}`),
         });

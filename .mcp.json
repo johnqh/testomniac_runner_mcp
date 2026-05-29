@@ -7,7 +7,8 @@
         "/Users/johnhuang/projects/testomniac_runner_mcp/src/index.ts"
       ],
       "env": {
-        "TESTOMNIAC_USER_API_KEY": "tst_2a7f359d874f936b93046d8d60797e1df621896cb6947709"
+        "TESTOMNIAC_API_URL": "http://localhost:8027",
+        "TESTOMNIAC_USER_API_KEY": "tst_790a6c34b8d88f03ba94648f655deb14c4123fc9b9244886"
       }
     }
   }

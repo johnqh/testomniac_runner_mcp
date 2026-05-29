@@ -5,14 +5,23 @@ description: Use when testing a web application, verifying UI changes, checking 
 
 # Test App
 
-Test a web application using Testomniac's runner. All flows go through
-the testomniac runner via `run_full_scan` or `run_sequence`, which
+Test a web application using Testomniac. The MCP creates scans via
+the Testomniac API, and a separate runner process picks them up,
 launches a browser, crawls pages, runs expertises, and persists
-findings through the Testomniac API.
+findings. The MCP polls for completion and returns results.
+
+## Architecture
+
+`run_full_scan` does NOT run scans in-process. It:
+1. Calls POST /api/v1/scan to create a pending discovery run
+2. Auto-starts a testomniac_runner daemon process (if not already running)
+3. The runner picks up the pending run and executes it
+4. The MCP polls the API until the run completes
+5. Status updates are logged to console during polling
 
 ## MCP Servers Used
 
-- **testomniac-runner** — Browser control, scanning, sequence execution
+- **testomniac-runner** — Scan creation and polling, sequence execution
   (run_full_scan, run_sequence, set_api_key, browser_launch,
   browser_navigate, browser_click, browser_type, browser_screenshot,
   browser_close, browser_status)
@@ -40,11 +49,12 @@ Do NOT proceed without a URL.
 
 ### 2. Check API Key (required for all flows)
 
-All flows require a Testomniac API key. The runner uses the API to
-create discovery runs, store findings, and manage test data.
+All scan and scenario flows require a Testomniac API key. A local
+developer runner can use an entity API key (`tst_...`) for both scan
+creation and scanner endpoints. A server-side runner can use the global
+scanner API key.
 
-Call `browser_status` to check if the session is active. Then attempt
-the scan — if it fails with "API not configured", prompt:
+Attempt the scan — if it fails with "API not configured", prompt:
 
 > "I need a Testomniac API key to run scans.
 >
@@ -60,7 +70,9 @@ the scan — if it fails with "API not configured", prompt:
 > `Set the testomniac API key to tst_... and API URL to https://api.testomniac.com`"
 
 Wait for the user to provide the key. Once provided, call `set_api_key`
-to configure it, then continue.
+to configure it, then continue. For local development, set the local API
+URL too, for example:
+`Set the testomniac API key to tst_... and API URL to http://localhost:8027`
 
 ### 3. Verify Dev Server is Running (for localhost URLs)
 
@@ -95,17 +107,19 @@ baseline findings.
 
 ### Step 1: Run the Scan
 
-Call `run_full_scan` (testomniac-runner) with:
+Tell the user the scan is starting, then call `run_full_scan`
+(testomniac-runner) with:
 - `baseUrl`: the target URL
 - `scanMode`: `"minimum"`
 
 This will:
-- Auto-create a discovery run via the API
-- Launch the browser
-- Navigate to all discoverable pages (following internal links)
-- Run expertise evaluations (SEO, Security, Content, UI, Accessibility, Performance)
-- Record findings via the API
-- Return results with page count, findings, and event log
+- Create a discovery run via the API
+- A separate runner process picks it up automatically
+- The MCP polls until the run completes (status updates appear in console)
+- Return results with page count and run status
+
+**Important:** The tool blocks while polling. If the scan times out
+or the runner is not running, it returns an error.
 
 ### Step 2: Report Results
 
@@ -113,18 +127,10 @@ Parse the `run_full_scan` response and report:
 
 > **Quick Scan Complete: {URL}**
 >
-> - Pages discovered: {N}
-> - Findings: {F}
-> - Duration: {D}
->
-> **Findings:**
-> - [{type}] {title}
->   - **Page:** {path}
->   - **Why it matters:** {explanation}
->   - **Fix:** {suggested fix}
->
-> **Personas detected:** (if any)
-> - **{persona title}**: {description}
+> - Pages discovered: {pagesFound}
+> - Interactions completed: {testRunsCompleted}
+> - Duration: {totalDurationMs}ms
+> - Status: {status}
 >
 > Want me to:
 > - Run a **full scan** with interaction testing?
@@ -140,12 +146,12 @@ bugs but takes longer.
 
 ### Step 1: Run the Scan
 
-Call `run_full_scan` (testomniac-runner) with:
+Tell the user the scan is starting, then call `run_full_scan`
+(testomniac-runner) with:
 - `baseUrl`: the target URL
 - `scanMode`: `"full"`
 
-This runs all phases: page discovery, element extraction, interaction
-testing, expertise evaluation, and finding creation.
+This creates a discovery run and polls until the runner completes it.
 
 ### Step 2: Report Results
 
@@ -153,30 +159,10 @@ Parse the response and report:
 
 > **Full Scan Complete: {URL}**
 >
-> - Pages discovered: {N}
-> - Total findings: {F}
-> - Duration: {D}
->
-> **Findings by expertise:**
-> - Tester: {count}
-> - SEO: {count}
-> - Security: {count}
-> - Content: {count}
-> - UI: {count}
-> - Accessibility: {count}
-> - Performance: {count}
->
-> **All findings:**
-> - [{type}] {title}
->   - **Page:** {path}
->   - **Why it matters:** {explanation}
->   - **Fix:** {suggested fix}
->
-> **Personas detected:**
-> - **{persona title}**: {description}
->
-> Now I can test specific user flows. For example:
-> "Test it as a {persona title}, {suggested action based on persona}"
+> - Pages discovered: {pagesFound}
+> - Interactions completed: {testRunsCompleted}
+> - Duration: {totalDurationMs}ms
+> - Status: {status}
 
 ---
 
@@ -227,11 +213,17 @@ If not, tell the user:
    > **Scenario: {title}**
    > Generated {N} test steps. Ready to run?
 
-### Step 3: Run the Sequence
+### Step 3: Create and Run the Sequence Run
 
-Call `run_sequence` (testomniac-runner) with the sequence run ID
-and runner ID. This executes all steps through the runner with
-expertise evaluation and finding persistence.
+Call `run_sequence` on **testomniac-api** with the generated sequence ID.
+This creates a pending sequence run and returns its run ID.
+
+Then call `run_sequence` on **testomniac-runner** with:
+- `sequenceRunId`: the sequence run ID returned by testomniac-api
+- `runnerId`: the runner ID
+
+This executes all steps through the runner with expertise evaluation
+and finding persistence.
 
 ### Step 4: Self-Healing Loop
 
@@ -310,8 +302,9 @@ After fixing issues, offer to re-run:
 | Error | Response |
 |-------|----------|
 | API not configured | Prompt for API key (see prerequisites) |
-| Browser launch fails | "Chromium may not be installed. Try `bun install` in the testomniac_runner_mcp directory, or set `CHROMIUM_PATH`." |
-| Page fails to load | "Could not load {URL}. Is the URL correct? If local, make sure the dev server is running." |
+| Scan timed out | "The scan timed out. The runner may have crashed. Check the console logs for errors." |
+| Failed to create discovery run | Check the API URL and key are correct. The API server must be running. |
+| Failed to poll test run | API may be down or the key may be invalid. |
 | No pages discovered | "The site hasn't been scanned yet. Want me to run a quick scan first?" |
 | Entity slug unknown | "What's your Testomniac organization name? Find it at testomniac.com in your org settings." |
 | No products found | "No products found. Run a scan first — it will create one automatically." |

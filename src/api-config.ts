@@ -30,6 +30,7 @@ function persistToMcpJson() {
     const server = mcp.mcpServers?.["testomniac-runner"];
     if (!server) return;
     if (!server.env) server.env = {};
+    if (apiUrl !== undefined) server.env.TESTOMNIAC_API_URL = apiUrl;
     if (apiKey !== undefined) server.env.TESTOMNIAC_USER_API_KEY = apiKey;
     writeFileSync(mcpJsonPath, JSON.stringify(mcp, null, 2) + "\n");
   } catch {
@@ -50,7 +51,13 @@ export function getApiConfig(): {
  * the product, runner, environment, and test run in one call.
  * Passes the entity API key via x-api-key header when available.
  */
-export async function createDiscoveryRun(baseUrl: string): Promise<{
+export async function createDiscoveryRun(
+  baseUrl: string,
+  options: {
+    sizeClass?: "desktop" | "mobile";
+    scanMode?: "full" | "partial" | "minimum";
+  } = {}
+): Promise<{
   testRunId: number;
   runnerId: number;
   productId: number;
@@ -70,7 +77,11 @@ export async function createDiscoveryRun(baseUrl: string): Promise<{
   const res = await fetch(`${apiUrl}/api/v1/scan`, {
     method: "POST",
     headers,
-    body: JSON.stringify({ url: baseUrl }),
+    body: JSON.stringify({
+      url: baseUrl,
+      ...(options.sizeClass ? { sizeClass: options.sizeClass } : {}),
+      ...(options.scanMode ? { scanMode: options.scanMode } : {}),
+    }),
   });
   const json = (await res.json()) as {
     success: boolean;

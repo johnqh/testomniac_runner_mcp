@@ -160,9 +160,10 @@ export function createAdapter(puppeteerPage: Page): BrowserAdapter {
       return puppeteerPage.url();
     },
     async screenshot(options?: { type?: string; quality?: number }) {
+      const type = (options?.type as "jpeg" | "png") || "jpeg";
       const buffer = await puppeteerPage.screenshot({
-        type: (options?.type as "jpeg" | "png") || "jpeg",
-        quality: options?.quality ?? 80,
+        type,
+        ...(type === "jpeg" ? { quality: options?.quality ?? 80 } : {}),
       });
       return new Uint8Array(buffer);
     },
