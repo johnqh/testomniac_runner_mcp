@@ -25,8 +25,12 @@ export function registerScanTools(server: McpServer) {
         .enum(["desktop", "mobile"])
         .optional()
         .describe("Device class (default: desktop)"),
+      scanMode: z
+        .enum(["full", "partial", "minimum"])
+        .optional()
+        .describe("Scan depth: 'full' runs all interactions (default), 'partial' skips redundant hover tests, 'minimum' only navigates pages without interaction testing"),
     },
-    async ({ testRunId, runnerId, baseUrl, sizeClass }) => {
+    async ({ testRunId, runnerId, baseUrl, sizeClass, scanMode }) => {
       // Auto-create discovery run if IDs not provided
       if (testRunId == null || runnerId == null) {
         try {
@@ -97,6 +101,7 @@ export function registerScanTools(server: McpServer) {
             runnerId,
             baseUrl,
             sizeClass: sizeClass === "mobile" ? SizeClass.Mobile : SizeClass.Desktop,
+            scanMode: scanMode ?? "full",
             runnerInstanceId: instanceId,
             runnerInstanceName: "mcp-runner",
           },
