@@ -31,6 +31,7 @@ interface TestRunStatus {
   testRunsCompleted: number | null;
   totalDurationMs: number | null;
   scanUrl: string | null;
+  status_update?: string | null;
 }
 
 async function pollTestRun(
@@ -46,6 +47,7 @@ async function pollTestRun(
   const start = Date.now();
   let lastPagesFound = 0;
   let lastTestRunsCompleted = 0;
+  let lastStatusMessage = "";
 
   while (Date.now() - start < POLL_TIMEOUT_MS) {
     const res = await fetch(`${apiUrl}/api/v1/scanner/test-runs/${testRunId}`, {
@@ -69,6 +71,11 @@ async function pollTestRun(
     // Log progress when it changes
     const pages = run.pagesFound ?? 0;
     const completed = run.testRunsCompleted ?? 0;
+    const statusMessage = run.status_update ?? "";
+    if (statusMessage && statusMessage !== lastStatusMessage) {
+      log(statusMessage);
+      lastStatusMessage = statusMessage;
+    }
     if (pages !== lastPagesFound || completed !== lastTestRunsCompleted) {
       log(
         `Run ${testRunId}: ${run.status} — ${pages} pages, ${completed} interactions completed`
@@ -121,6 +128,9 @@ export function registerScanTools(server: McpServer) {
         log(
           `Scan created: testRunId=${discovery.testRunId}, runnerId=${discovery.runnerId}`
         );
+        if (discovery.status_update) {
+          log(discovery.status_update);
+        }
       } catch (err) {
         return {
           content: [
@@ -164,6 +174,7 @@ export function registerScanTools(server: McpServer) {
                   productId: discovery.productId,
                   testEnvironmentId: discovery.testEnvironmentId,
                   status: run.status,
+                  status_update: run.status_update ?? null,
                   pagesFound: run.pagesFound ?? 0,
                   pageStatesFound: run.pageStatesFound ?? 0,
                   testRunsCompleted: run.testRunsCompleted ?? 0,
@@ -229,7 +240,9 @@ export function registerScanTools(server: McpServer) {
       const expertises = createDefaultExpertises();
 
       const events: string[] = [];
-      const eventHandler: ScanEventHandler = {
+      const eventHandler: ScanEventHandler & {
+        onStatusUpdate?: (update: { message: string; testRunId?: number }) => void;
+      } = {
         onPageFound: (p) => events.push(`Page found: ${p.relativePath}`),
         onPageStateCreated: (s) => events.push(`Page state created: ${s.pageStateId}`),
         onTestSurfaceCreated: (s) => events.push(`Surface created: ${s.title}`),
@@ -239,6 +252,7 @@ export function registerScanTools(server: McpServer) {
           events.push(`Test run ${r.testRunId}: ${r.passed ? "PASS" : "FAIL"}`),
         onFindingCreated: (f) => events.push(`Finding [${f.type}]: ${f.title}`),
         onStatsUpdated: () => {},
+        onStatusUpdate: update => events.push(`Status: ${update.message}`),
         onScreenshotCaptured: () => {},
         onScanComplete: () => {},
         onError: (e) => events.push(`Error: ${e.message}`),

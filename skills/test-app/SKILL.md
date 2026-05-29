@@ -17,7 +17,7 @@ findings. The MCP polls for completion and returns results.
 2. Auto-starts a testomniac_runner daemon process (if not already running)
 3. The runner picks up the pending run and executes it
 4. The MCP polls the API until the run completes
-5. Status updates are logged to console during polling
+5. Human-readable `status_update` messages are logged to console during polling
 
 ## MCP Servers Used
 
@@ -115,7 +115,7 @@ Tell the user the scan is starting, then call `run_full_scan`
 This will:
 - Create a discovery run via the API
 - A separate runner process picks it up automatically
-- The MCP polls until the run completes (status updates appear in console)
+- The MCP polls until the run completes (`status_update` messages appear in console)
 - Return results with page count and run status
 
 **Important:** The tool blocks while polling. If the scan times out
@@ -131,6 +131,7 @@ Parse the `run_full_scan` response and report:
 > - Interactions completed: {testRunsCompleted}
 > - Duration: {totalDurationMs}ms
 > - Status: {status}
+> - Last status: {status_update}
 >
 > Want me to:
 > - Run a **full scan** with interaction testing?
@@ -152,6 +153,8 @@ Tell the user the scan is starting, then call `run_full_scan`
 - `scanMode`: `"full"`
 
 This creates a discovery run and polls until the runner completes it.
+Detailed `status_update` messages are emitted while the runner navigates,
+runs interactions, records results, and detects personas.
 
 ### Step 2: Report Results
 
@@ -163,6 +166,7 @@ Parse the response and report:
 > - Interactions completed: {testRunsCompleted}
 > - Duration: {totalDurationMs}ms
 > - Status: {status}
+> - Last status: {status_update}
 
 ---
 

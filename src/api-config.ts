@@ -62,6 +62,7 @@ export async function createDiscoveryRun(
   runnerId: number;
   productId: number;
   testEnvironmentId: number;
+  status_update?: string;
 }> {
   if (!apiUrl) {
     throw new Error(
@@ -86,7 +87,13 @@ export async function createDiscoveryRun(
   const json = (await res.json()) as {
     success: boolean;
     error?: string;
-    data?: { testRunId: number; runnerId: number; productId: number; testEnvironmentId: number };
+    data?: {
+      testRunId: number;
+      runnerId: number;
+      productId: number;
+      testEnvironmentId: number;
+      status_update?: string;
+    };
   };
   if (!json.success || !json.data) {
     throw new Error(`Failed to create discovery run: ${json.error ?? res.statusText}`);
