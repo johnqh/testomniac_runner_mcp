@@ -11,9 +11,39 @@ import { ApiClient } from "@sudobility/testomniac_runner_service";
 
 const mcpJsonPath = resolve(import.meta.dir, "../.mcp.json");
 
+function loadConfigFromMcpJson():
+  | { apiUrl?: string; apiKey?: string }
+  | undefined {
+  try {
+    const raw = readFileSync(mcpJsonPath, "utf-8");
+    const mcp = JSON.parse(raw) as {
+      mcpServers?: {
+        "testomniac-runner"?: {
+          env?: {
+            TESTOMNIAC_API_URL?: string;
+            TESTOMNIAC_USER_API_KEY?: string;
+          };
+        };
+      };
+    };
+    const env = mcp.mcpServers?.["testomniac-runner"]?.env;
+    return {
+      apiUrl: env?.TESTOMNIAC_API_URL,
+      apiKey: env?.TESTOMNIAC_USER_API_KEY,
+    };
+  } catch {
+    return undefined;
+  }
+}
+
+const mcpConfig = loadConfigFromMcpJson();
+
 let apiUrl: string | undefined =
-  process.env["TESTOMNIAC_API_URL"] || "https://api.testomniac.com";
-let apiKey: string | undefined = process.env["TESTOMNIAC_USER_API_KEY"];
+  process.env["TESTOMNIAC_API_URL"] ||
+  mcpConfig?.apiUrl ||
+  "https://api.testomniac.com";
+let apiKey: string | undefined =
+  process.env["TESTOMNIAC_USER_API_KEY"] || mcpConfig?.apiKey;
 let client: ApiClient | null = null;
 
 export function setApiConfig(config: { apiUrl?: string; apiKey?: string }) {

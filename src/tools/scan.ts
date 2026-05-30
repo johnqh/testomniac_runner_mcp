@@ -1,5 +1,11 @@
 import { z } from "zod/v4";
+import { appendFileSync } from "node:fs";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import type { RequestHandlerExtra } from "@modelcontextprotocol/sdk/shared/protocol.js";
+import type {
+  ServerNotification,
+  ServerRequest,
+} from "@modelcontextprotocol/sdk/types.js";
 import { ensureBrowser, createAdapter } from "../browser-session.ts";
 import {
   getConfiguredApiClient,
@@ -8,6 +14,7 @@ import {
 } from "../api-config.ts";
 import { spawnRunner } from "../runner-process.ts";
 import { ensureRunnerDaemon } from "../runner-daemon.ts";
+import { getRunnerIdentity } from "../runner-identity.ts";
 import {
   runSequenceRun,
   createDefaultExpertises,
@@ -23,6 +30,77 @@ function log(msg: string) {
   console.error(`[testomniac] ${msg}`);
 }
 
+type ToolExtra = RequestHandlerExtra<ServerRequest, ServerNotification>;
+type StatusReporter = (message: string) => Promise<void>;
+
+function isMeaningfulInteractionStatusUpdate(message: string): boolean {
+  const normalized = message.trim();
+  if (!normalized) return false;
+
+  const lower = normalized.toLowerCase();
+  if (
+    lower.includes(" pending") ||
+    lower.endsWith("pending") ||
+    lower.includes("waiting for runner") ||
+    lower.includes("creating discovery scan") ||
+    lower.includes("scan created") ||
+    lower.includes("starting local runner") ||
+    lower.includes("run ") && lower.includes(" pages, ")
+  ) {
+    return false;
+  }
+
+  return /^(navigate|click|hover|type|fill|select|press|submit|scroll|wait|open|check|verify|detect|run|record)\b/i.test(
+    normalized
+  );
+}
+
+function writeTerminalStatus(message: string) {
+  const line = `[testomniac] ${message}\n`;
+  try {
+    appendFileSync("/dev/tty", line);
+  } catch {
+    // Claude Code may launch MCP servers without a controlling TTY.
+  }
+}
+
+function createStatusReporter(
+  server: McpServer,
+  statusUpdates: string[],
+  extra?: ToolExtra
+): StatusReporter {
+  let progress = 0;
+  return async (message: string) => {
+    if (!isMeaningfulInteractionStatusUpdate(message)) return;
+
+    statusUpdates.push(message);
+    log(message);
+    writeTerminalStatus(message);
+
+    const progressToken = extra?._meta?.progressToken;
+    if (extra && progressToken !== undefined) {
+      progress += 1;
+      await extra.sendNotification({
+        method: "notifications/progress",
+        params: {
+          progressToken,
+          progress,
+          message,
+        },
+      });
+    }
+
+    await server.sendLoggingMessage(
+      {
+        level: "info",
+        logger: "testomniac",
+        data: message,
+      },
+      extra?.sessionId
+    );
+  };
+}
+
 interface TestRunStatus {
   id: number;
   status: string;
@@ -35,7 +113,8 @@ interface TestRunStatus {
 }
 
 async function pollTestRun(
-  testRunId: number
+  testRunId: number,
+  reportStatus: StatusReporter
 ): Promise<TestRunStatus> {
   const { apiUrl, apiKey } = getApiConfig();
   if (!apiUrl || !apiKey) throw new Error("API not configured");
@@ -73,21 +152,15 @@ async function pollTestRun(
     const completed = run.testRunsCompleted ?? 0;
     const statusMessage = run.status_update ?? "";
     if (statusMessage && statusMessage !== lastStatusMessage) {
-      log(statusMessage);
+      await reportStatus(statusMessage);
       lastStatusMessage = statusMessage;
     }
     if (pages !== lastPagesFound || completed !== lastTestRunsCompleted) {
-      log(
-        `Run ${testRunId}: ${run.status} — ${pages} pages, ${completed} interactions completed`
-      );
       lastPagesFound = pages;
       lastTestRunsCompleted = completed;
     }
 
     if (run.status === "completed" || run.status === "failed") {
-      log(
-        `Run ${testRunId}: ${run.status} in ${run.totalDurationMs ?? Date.now() - start}ms — ${pages} pages found`
-      );
       return run;
     }
 
@@ -116,20 +189,22 @@ export function registerScanTools(server: McpServer) {
           "Scan depth: 'full' runs all interactions (default), 'partial' skips redundant hover tests, 'minimum' only navigates pages without interaction testing"
         ),
     },
-    async ({ baseUrl, sizeClass, scanMode }) => {
+    async ({ baseUrl, sizeClass, scanMode }, extra) => {
+      const statusUpdates: string[] = [];
+      const reportStatus = createStatusReporter(server, statusUpdates, extra);
       // Step 1: Create discovery run via API
       let discovery;
       try {
-        log(`Creating discovery scan for ${baseUrl}...`);
+        await reportStatus(`Creating discovery scan for ${baseUrl}...`);
         discovery = await createDiscoveryRun(baseUrl, {
           sizeClass,
           scanMode: scanMode ?? "full",
         });
-        log(
+        await reportStatus(
           `Scan created: testRunId=${discovery.testRunId}, runnerId=${discovery.runnerId}`
         );
         if (discovery.status_update) {
-          log(discovery.status_update);
+          await reportStatus(discovery.status_update);
         }
       } catch (err) {
         return {
@@ -160,8 +235,8 @@ export function registerScanTools(server: McpServer) {
 
       // Step 3: Poll until the runner picks it up and completes
       try {
-        log("Waiting for runner to pick up the scan...");
-        const run = await pollTestRun(discovery.testRunId);
+        await reportStatus("Waiting for runner to pick up the scan...");
+        const run = await pollTestRun(discovery.testRunId, reportStatus);
 
         return {
           content: [
@@ -175,6 +250,7 @@ export function registerScanTools(server: McpServer) {
                   testEnvironmentId: discovery.testEnvironmentId,
                   status: run.status,
                   status_update: run.status_update ?? null,
+                  status_updates: statusUpdates,
                   pagesFound: run.pagesFound ?? 0,
                   pageStatesFound: run.pageStatesFound ?? 0,
                   testRunsCompleted: run.testRunsCompleted ?? 0,
@@ -196,6 +272,7 @@ export function registerScanTools(server: McpServer) {
                   error: err instanceof Error ? err.message : String(err),
                   testRunId: discovery.testRunId,
                   runnerId: discovery.runnerId,
+                  status_updates: statusUpdates,
                 },
                 null,
                 2
@@ -219,7 +296,9 @@ export function registerScanTools(server: McpServer) {
         .optional()
         .describe("Device class (default: desktop)"),
     },
-    async ({ sequenceRunId, runnerId, sizeClass }) => {
+    async ({ sequenceRunId, runnerId, sizeClass }, extra) => {
+      const statusUpdates: string[] = [];
+      const reportStatus = createStatusReporter(server, statusUpdates, extra);
       let api;
       try {
         api = getConfiguredApiClient();
@@ -243,30 +322,60 @@ export function registerScanTools(server: McpServer) {
       const eventHandler: ScanEventHandler & {
         onStatusUpdate?: (update: { message: string; testRunId?: number }) => void;
       } = {
-        onPageFound: (p) => events.push(`Page found: ${p.relativePath}`),
-        onPageStateCreated: (s) => events.push(`Page state created: ${s.pageStateId}`),
-        onTestSurfaceCreated: (s) => events.push(`Surface created: ${s.title}`),
-        onTestInteractionRunCompleted: (r) =>
-          events.push(`Step ${r.testInteractionRunId}: ${r.passed ? "PASS" : "FAIL"}`),
-        onTestRunCompleted: (r) =>
-          events.push(`Test run ${r.testRunId}: ${r.passed ? "PASS" : "FAIL"}`),
-        onFindingCreated: (f) => events.push(`Finding [${f.type}]: ${f.title}`),
+        onPageFound: (p) => {
+          const message = `Page found: ${p.relativePath}`;
+          events.push(message);
+          void reportStatus(message);
+        },
+        onPageStateCreated: (s) => {
+          const message = `Page state created: ${s.pageStateId}`;
+          events.push(message);
+          void reportStatus(message);
+        },
+        onTestSurfaceCreated: (s) => {
+          const message = `Surface created: ${s.title}`;
+          events.push(message);
+          void reportStatus(message);
+        },
+        onTestInteractionRunCompleted: (r) => {
+          const message = `Step ${r.testInteractionRunId}: ${r.passed ? "PASS" : "FAIL"}`;
+          events.push(message);
+          void reportStatus(message);
+        },
+        onTestRunCompleted: (r) => {
+          const message = `Test run ${r.testRunId}: ${r.passed ? "PASS" : "FAIL"}`;
+          events.push(message);
+          void reportStatus(message);
+        },
+        onFindingCreated: (f) => {
+          const message = `Finding [${f.type}]: ${f.title}`;
+          events.push(message);
+          void reportStatus(message);
+        },
         onStatsUpdated: () => {},
-        onStatusUpdate: update => events.push(`Status: ${update.message}`),
+        onStatusUpdate: update => {
+          events.push(`Status: ${update.message}`);
+          void reportStatus(update.message);
+        },
         onScreenshotCaptured: () => {},
         onScanComplete: () => {},
-        onError: (e) => events.push(`Error: ${e.message}`),
+        onError: (e) => {
+          const message = `Error: ${e.message}`;
+          events.push(message);
+          void reportStatus(message);
+        },
       };
 
       let result: SequenceRunResult;
       try {
+        const identity = getRunnerIdentity();
         result = await runSequenceRun(
           adapter,
           {
             sequenceRunId,
             runnerId,
-            runnerInstanceId: crypto.randomUUID(),
-            runnerInstanceName: "mcp-runner",
+            runnerInstanceId: identity.id,
+            runnerInstanceName: identity.name,
             sizeClass: sizeClass === "mobile" ? SizeClass.Mobile : SizeClass.Desktop,
           },
           api,
@@ -283,6 +392,7 @@ export function registerScanTools(server: McpServer) {
                   error: err instanceof Error ? err.message : String(err),
                   currentUrl: page.url(),
                   events,
+                  status_updates: statusUpdates,
                 },
                 null,
                 2
@@ -303,6 +413,7 @@ export function registerScanTools(server: McpServer) {
                 currentUrl: page.url(),
                 allStepsPassed: result.interactionsFailed === 0,
                 events,
+                status_updates: statusUpdates,
               },
               null,
               2

@@ -107,15 +107,18 @@ baseline findings.
 
 ### Step 1: Run the Scan
 
-Tell the user the scan is starting, then call `run_full_scan`
-(testomniac-runner) with:
-- `baseUrl`: the target URL
-- `scanMode`: `"minimum"`
+Tell the user the scan is starting, then run this Bash command so
+status updates are visible in Claude Code's console:
+
+```bash
+cd /Users/johnhuang/projects/testomniac_runner_mcp
+bun run scan:status <baseUrl> --scan-mode minimum
+```
 
 This will:
 - Create a discovery run via the API
 - A separate runner process picks it up automatically
-- The MCP polls until the run completes (`status_update` messages appear in console)
+- The CLI polls until the run completes and prints `status_update` messages to stdout
 - Return results with page count and run status
 
 **Important:** The tool blocks while polling. If the scan times out
@@ -147,10 +150,13 @@ bugs but takes longer.
 
 ### Step 1: Run the Scan
 
-Tell the user the scan is starting, then call `run_full_scan`
-(testomniac-runner) with:
-- `baseUrl`: the target URL
-- `scanMode`: `"full"`
+Tell the user the scan is starting, then run this Bash command so
+status updates are visible in Claude Code's console:
+
+```bash
+cd /Users/johnhuang/projects/testomniac_runner_mcp
+bun run scan:status <baseUrl> --scan-mode full
+```
 
 This creates a discovery run and polls until the runner completes it.
 Detailed `status_update` messages are emitted while the runner navigates,

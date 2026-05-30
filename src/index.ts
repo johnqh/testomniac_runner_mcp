@@ -25,6 +25,7 @@ const server = new McpServer({
   name: "testomniac-runner",
   version: "0.1.0",
 });
+server.server.registerCapabilities({ logging: {} });
 
 // Register all tool groups
 registerConfigTools(server);

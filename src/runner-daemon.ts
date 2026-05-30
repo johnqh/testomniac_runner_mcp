@@ -6,6 +6,7 @@
 import { spawn, type ChildProcess } from "child_process";
 import { resolve } from "path";
 import { getApiConfig } from "./api-config.ts";
+import { getRunnerIdentity } from "./runner-identity.ts";
 
 let runnerProcess: ChildProcess | null = null;
 let runnerExitPromise: Promise<number | null> | null = null;
@@ -51,6 +52,7 @@ export function ensureRunnerDaemon(): void {
   }
 
   const entrypoint = getRunnerEntrypoint();
+  const identity = getRunnerIdentity();
   log(`Starting runner daemon: ${entrypoint}`);
 
   runnerProcess = spawn("bun", ["run", entrypoint], {
@@ -58,6 +60,8 @@ export function ensureRunnerDaemon(): void {
       ...process.env,
       TESTOMNIAC_API_URL: config.apiUrl,
       SCANNER_API_KEY: config.apiKey,
+      TESTOMNIAC_RUNNER_PROCESS_INSTANCE_ID: identity.id,
+      TESTOMNIAC_RUNNER_INSTANCE_NAME: identity.name,
       SCAN_POLL_INTERVAL_MS: "3000",
       MAX_CONCURRENT_RUNNERS: "3",
       LOG_LEVEL: "info",

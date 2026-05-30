@@ -6,6 +6,7 @@
 import { spawn, type ChildProcess } from "child_process";
 import { resolve } from "path";
 import { getApiConfig } from "./api-config.ts";
+import { getRunnerIdentity } from "./runner-identity.ts";
 
 function getRunnerPath(): string {
   // Resolve from node_modules (installed as npm dependency)
@@ -48,6 +49,7 @@ export function spawnRunner(options: RunnerProcessOptions): {
   }
 
   const runnerPath = getRunnerPath();
+  const identity = getRunnerIdentity();
   const args = ["run", runnerPath];
 
   if (options.runId) {
@@ -68,6 +70,9 @@ export function spawnRunner(options: RunnerProcessOptions): {
       ...process.env,
       TESTOMNIAC_API_URL: config.apiUrl,
       SCANNER_API_KEY: config.apiKey,
+      TESTOMNIAC_RUNNER_PROCESS_INSTANCE_ID: identity.id,
+      TESTOMNIAC_RUNNER_INSTANCE_ID: identity.id,
+      TESTOMNIAC_RUNNER_INSTANCE_NAME: identity.name,
     },
     stdio: ["ignore", "pipe", "pipe"],
   });

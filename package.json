@@ -1,6 +1,6 @@
 {
   "name": "@sudobility/testomniac_runner_mcp",
-  "version": "0.1.45",
+  "version": "0.1.46",
   "description": "MCP server for the Testomniac Runner - gives AI assistants browser control and test execution capabilities",
   "type": "module",
   "license": "BUSL-1.1",
@@ -13,6 +13,7 @@
   "scripts": {
     "dev": "bun run src/index.ts",
     "build": "bun build src/index.ts --outdir dist --target bun --minify",
+    "scan:status": "bun run src/scan-cli.ts",
     "typecheck": "tsc --noEmit",
     "start": "bun run dist/index.js"
   },
@@ -22,7 +23,7 @@
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.29.0",
-    "@sudobility/testomniac_runner": "^0.0.132",
+    "@sudobility/testomniac_runner": "^0.0.133",
     "@sudobility/testomniac_runner_service": "^0.1.131",
     "@sudobility/testomniac_types": "^0.0.69",
     "puppeteer": "^25.0.4",
