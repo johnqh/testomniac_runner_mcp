@@ -68,7 +68,7 @@ export function ensureRunnerDaemon(): void {
       // Use a different port so it doesn't conflict
       PORT: "0",
     },
-    stdio: ["ignore", "pipe", "pipe"],
+    stdio: ["pipe", "pipe", "pipe"],
     detached: false,
   });
 
@@ -116,4 +116,27 @@ export async function stopRunnerDaemon(): Promise<void> {
   runnerProcess = null;
   runnerExitPromise = null;
   log("Runner daemon stopped");
+}
+
+/**
+ * Send a JSON message to the runner daemon's stdin.
+ * Returns false if the daemon is not running or stdin is not writable.
+ */
+export function sendDaemonMessage(msg: Record<string, unknown>): boolean {
+  if (!isRunnerAlive() || !runnerProcess?.stdin?.writable) return false;
+  try {
+    runnerProcess.stdin.write(JSON.stringify(msg) + "\n");
+    return true;
+  } catch {
+    log("Failed to send IPC message to daemon");
+    return false;
+  }
+}
+
+/**
+ * Send a stop_run IPC message to the runner daemon for a specific run.
+ */
+export function stopDaemonRun(runId: number): boolean {
+  log(`Sending stop_run for runId=${runId}`);
+  return sendDaemonMessage({ type: "stop_run", runId });
 }

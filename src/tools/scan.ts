@@ -13,7 +13,7 @@ import {
   getApiConfig,
 } from "../api-config.ts";
 import { spawnRunner } from "../runner-process.ts";
-import { ensureRunnerDaemon } from "../runner-daemon.ts";
+import { ensureRunnerDaemon, stopDaemonRun } from "../runner-daemon.ts";
 import { getRunnerIdentity } from "../runner-identity.ts";
 import {
   runSequenceRun,
@@ -25,6 +25,8 @@ import {
 
 const POLL_INTERVAL_MS = 3_000;
 const POLL_TIMEOUT_MS = 10 * 60_000; // 10 minutes
+
+const activeScans = new Map<number, { startedAt: number; baseUrl: string }>();
 
 function log(msg: string) {
   console.error(`[testomniac] ${msg}`);
@@ -160,7 +162,7 @@ async function pollTestRun(
       lastTestRunsCompleted = completed;
     }
 
-    if (run.status === "completed" || run.status === "failed") {
+    if (run.status === "completed" || run.status === "failed" || run.status === "stopped") {
       return run;
     }
 
@@ -206,6 +208,10 @@ export function registerScanTools(server: McpServer) {
         if (discovery.status_update) {
           await reportStatus(discovery.status_update);
         }
+        activeScans.set(discovery.testRunId, {
+          startedAt: Date.now(),
+          baseUrl,
+        });
       } catch (err) {
         return {
           content: [
@@ -237,6 +243,7 @@ export function registerScanTools(server: McpServer) {
       try {
         await reportStatus("Waiting for runner to pick up the scan...");
         const run = await pollTestRun(discovery.testRunId, reportStatus);
+        activeScans.delete(discovery.testRunId);
 
         return {
           content: [
@@ -263,6 +270,7 @@ export function registerScanTools(server: McpServer) {
           ],
         };
       } catch (err) {
+        activeScans.delete(discovery.testRunId);
         return {
           content: [
             {
@@ -533,6 +541,76 @@ export function registerScanTools(server: McpServer) {
           isError: true,
         };
       }
+    }
+  );
+
+  server.tool(
+    "stop_scan",
+    "Stop an active scan gracefully. The current interaction will finish, then remaining work is cancelled and the run is marked as stopped.",
+    {
+      testRunId: z
+        .number()
+        .describe("The test run ID of the active scan to stop"),
+    },
+    async ({ testRunId }) => {
+      if (!activeScans.has(testRunId)) {
+        return {
+          content: [
+            {
+              type: "text",
+              text: `No active scan found with testRunId=${testRunId}. Use list_active_scans to see running scans.`,
+            },
+          ],
+          isError: true,
+        };
+      }
+
+      const sent = stopDaemonRun(testRunId);
+      if (!sent) {
+        return {
+          content: [
+            {
+              type: "text",
+              text: "Runner daemon is not running or stdin is not writable. The scan may have already finished.",
+            },
+          ],
+          isError: true,
+        };
+      }
+
+      return {
+        content: [
+          {
+            type: "text",
+            text: `Stop signal sent for testRunId=${testRunId}. The current interaction will finish, then the scan will stop.`,
+          },
+        ],
+      };
+    }
+  );
+
+  server.tool(
+    "list_active_scans",
+    "List all currently active scans started by this MCP session.",
+    {},
+    async () => {
+      const scans = Array.from(activeScans.entries()).map(
+        ([testRunId, info]) => ({
+          testRunId,
+          baseUrl: info.baseUrl,
+          startedAt: new Date(info.startedAt).toISOString(),
+          elapsedMs: Date.now() - info.startedAt,
+        })
+      );
+
+      return {
+        content: [
+          {
+            type: "text",
+            text: JSON.stringify(scans, null, 2),
+          },
+        ],
+      };
     }
   );
 }
