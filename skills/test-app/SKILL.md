@@ -1,6 +1,6 @@
 ---
 name: test-app
-description: Use when testing a web application, verifying UI changes, checking page health, running accessibility/SEO/security/performance audits, validating a web page, or testing user flows. Trigger on /test-app, "test this page", "check for bugs", "run a health check", "audit this URL", "verify my changes work", "test it as a [persona]", "do a complete scan", "quick scan", or after making frontend changes when the user wants to confirm they work.
+description: Use when testing a web application, verifying UI changes, checking page health, running accessibility/SEO/security/performance audits, validating a web page, testing user flows, or stopping an active scan. Trigger on /test-app, "test this page", "check for bugs", "run a health check", "audit this URL", "verify my changes work", "test it as a [persona]", "do a complete scan", "quick scan", "stop the scan", "cancel scan", or after making frontend changes when the user wants to confirm they work.
 ---
 
 # Test App
@@ -21,10 +21,11 @@ findings. The MCP polls for completion and returns results.
 
 ## MCP Servers Used
 
-- **testomniac-runner** — Scan creation and polling, sequence execution
-  (run_full_scan, run_sequence, set_api_key, browser_launch,
-  browser_navigate, browser_click, browser_type, browser_screenshot,
-  browser_close, browser_status)
+- **testomniac-runner** — Scan creation and polling, sequence execution,
+  scan lifecycle management
+  (run_full_scan, run_sequence, stop_scan, list_active_scans,
+  set_api_key, browser_launch, browser_navigate, browser_click,
+  browser_type, browser_screenshot, browser_close, browser_status)
 - **testomniac-api** (optional) — Query scan results, manage scenarios
   (list_run_findings, get_finding_detail, list_run_pages,
   get_run_summary, create_scenario, generate_sequence, list_products,
@@ -93,9 +94,31 @@ Match the user's request to one of three flows:
 | "quick scan", "test this page", "check for bugs", "health check" | **Flow A: Quick Scan** (minimum mode) |
 | "scan", "full scan", "scan my site", "complete scan" | **Flow B: Full Scan** (full mode) |
 | "test it as a shopper", "add to cart and check out", "test the login flow" | **Flow C: Scenario Test** |
+| "stop", "cancel", "abort the scan", "stop scanning" | **Stopping a Scan** (see below) |
 
 If the request includes "scan" in any form, use Flow A or B — never
 skip the runner. If unclear, default to Flow A (quick scan).
+
+---
+
+## Stopping a Scan
+
+If the user says "stop", "cancel", "abort the scan", or similar while
+a scan is running:
+
+1. Call `list_active_scans` (testomniac-runner) to get active scan IDs.
+2. If there are active scans, call `stop_scan` with the `testRunId`.
+   - The current interaction will finish, then remaining work is
+     cancelled and the run is marked as "stopped".
+3. Report to the user:
+   > "Scan stopped. The current interaction finished and remaining
+   > work was cancelled."
+   >
+   > - Interactions completed before stop: {N}
+   > - Status: stopped
+
+If `list_active_scans` returns an empty list, the scan may have
+already finished. Check the last scan results instead.
 
 ---
 
@@ -318,3 +341,6 @@ After fixing issues, offer to re-run:
 | No pages discovered | "The site hasn't been scanned yet. Want me to run a quick scan first?" |
 | Entity slug unknown | "What's your Testomniac organization name? Find it at testomniac.com in your org settings." |
 | No products found | "No products found. Run a scan first — it will create one automatically." |
+| No active scan to stop | "No scan is currently running. It may have already finished." |
+| Runner daemon not running | "The runner daemon is not running. The scan may have already completed or crashed." |
+| Scan status is "stopped" | The scan was stopped gracefully. Report partial results and offer to re-run. |
