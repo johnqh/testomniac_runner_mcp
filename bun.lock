@@ -6,7 +6,7 @@
       "name": "testomniac_runner_mcp",
       "dependencies": {
         "@modelcontextprotocol/sdk": "^1.29.0",
-        "@sudobility/testomniac_runner": "^0.0.147",
+        "@sudobility/testomniac_runner": "^0.0.148",
         "@sudobility/testomniac_runner_service": "^0.1.142",
         "@sudobility/testomniac_types": "^0.0.75",
         "puppeteer": "^25.0.4",
@@ -37,7 +37,7 @@
 
     "@sudobility/signic_sdk": ["@sudobility/signic_sdk@0.1.7", "", {}, "sha512-5XSgHSVsmyrMQ/ui1nDywwzt9dbRCsaeJ5tX6mKw2ZXbTZ82OsMr+dqDyV9XV3pfy7IHRIZq73af5KBamx72Fw=="],
 
-    "@sudobility/testomniac_runner": ["@sudobility/testomniac_runner@0.0.147", "", { "dependencies": { "@noble/curves": "^1.0.0", "@noble/hashes": "^1.0.0", "@sudobility/signic_sdk": "^0.1.7", "@sudobility/testomniac_runner_service": "^0.1.140", "@sudobility/testomniac_types": "^0.0.75", "hono": "^4.7.0", "jose": "^6.1.2", "openai": "^6.7.0", "pino": "^10.1.0", "postmark": "^4.0.7", "puppeteer-core": "^24.31.0" } }, "sha512-H70LR7rdKVe0ZcZUO1WIGHhWxGDn/C0zsk3q+6xAAkIqdNiZuJPeOK3JCMYC1+33ALsUo3NqX2XPDw7p+T39/w=="],
+    "@sudobility/testomniac_runner": ["@sudobility/testomniac_runner@0.0.148", "", { "dependencies": { "@noble/curves": "^1.0.0", "@noble/hashes": "^1.0.0", "@sudobility/signic_sdk": "^0.1.7", "@sudobility/testomniac_runner_service": "^0.1.142", "@sudobility/testomniac_types": "^0.0.75", "hono": "^4.7.0", "jose": "^6.1.2", "openai": "^6.7.0", "pino": "^10.1.0", "postmark": "^4.0.7", "puppeteer-core": "^24.31.0" } }, "sha512-oUmvY+Jvu1GPpqTaXbkSQTQoTXFSefW0DqKpfxUcmqKU1qMNi1PlRGJ1PDJpuQS5UNaEXhtf0HY+WktJIY0ftw=="],
 
     "@sudobility/testomniac_runner_service": ["@sudobility/testomniac_runner_service@0.1.142", "", { "peerDependencies": { "@sudobility/testomniac_types": "^0.0.75" } }, "sha512-r49oGBT4CFuKr/VyQT1I/9/IleINR373aQQR3up5FcBFViHEl+ehdreVYICYvuukajyykamfPAeshkT0brN60A=="],
 
