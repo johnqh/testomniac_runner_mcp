@@ -6,8 +6,8 @@
       "name": "testomniac_runner_mcp",
       "dependencies": {
         "@modelcontextprotocol/sdk": "^1.29.0",
-        "@sudobility/testomniac_runner": "^0.0.171",
-        "@sudobility/testomniac_runner_service": "^0.1.165",
+        "@sudobility/testomniac_runner": "^0.0.172",
+        "@sudobility/testomniac_runner_service": "^0.1.166",
         "@sudobility/testomniac_types": "^0.0.80",
         "puppeteer": "^25.0.4",
         "zod": "^4.4.3",
@@ -37,9 +37,9 @@
 
     "@sudobility/signic_sdk": ["@sudobility/signic_sdk@0.1.7", "", {}, "sha512-5XSgHSVsmyrMQ/ui1nDywwzt9dbRCsaeJ5tX6mKw2ZXbTZ82OsMr+dqDyV9XV3pfy7IHRIZq73af5KBamx72Fw=="],
 
-    "@sudobility/testomniac_runner": ["@sudobility/testomniac_runner@0.0.171", "", { "dependencies": { "@noble/curves": "^1.0.0", "@noble/hashes": "^1.0.0", "@sudobility/signic_sdk": "^0.1.7", "@sudobility/testomniac_runner_service": "^0.1.165", "@sudobility/testomniac_types": "^0.0.80", "hono": "^4.7.0", "jose": "^6.1.2", "openai": "^6.7.0", "pino": "^10.1.0", "postmark": "^4.0.7", "puppeteer-core": "^24.31.0" } }, "sha512-Ee4rIzl6k1UM0VXyC7WO9cV1lNt3zjWGFlK4Qqn+wz/ZhxGkiSjYtzYOm5ltqEdd918Ix8psFTUAqQg0F4s9RQ=="],
+    "@sudobility/testomniac_runner": ["@sudobility/testomniac_runner@0.0.172", "", { "dependencies": { "@noble/curves": "^1.0.0", "@noble/hashes": "^1.0.0", "@sudobility/signic_sdk": "^0.1.7", "@sudobility/testomniac_runner_service": "^0.1.166", "@sudobility/testomniac_types": "^0.0.80", "hono": "^4.7.0", "jose": "^6.1.2", "openai": "^6.7.0", "pino": "^10.1.0", "postmark": "^4.0.7", "puppeteer-core": "^24.31.0" } }, "sha512-suqOYMb2IHRyFOJA8lm0m642K3ShovbbArzqTidhAwxN71p8dSMYkb/OAZFrwoP/kqQe/dHXybPCDm7EImi6KA=="],
 
-    "@sudobility/testomniac_runner_service": ["@sudobility/testomniac_runner_service@0.1.165", "", { "peerDependencies": { "@sudobility/testomniac_types": "^0.0.80" } }, "sha512-DqNFEz6QI5LxlN96aOb8WJMfzEvVqSxmFilswtHzHbvNGzZPzxtX0BD2aCpahLxE6iX+2IfpHV3PcqW93/t4Iw=="],
+    "@sudobility/testomniac_runner_service": ["@sudobility/testomniac_runner_service@0.1.166", "", { "peerDependencies": { "@sudobility/testomniac_types": "^0.0.80" } }, "sha512-FPSuTOSAQN77SAnhxw/FAXk7HZp6yshmcmDjo8DTt3bRzx2xMzt0cmoftjoIUtfapmFLXr68GpqJs6+H6KbgHQ=="],
 
     "@sudobility/testomniac_types": ["@sudobility/testomniac_types@0.0.80", "", { "peerDependencies": { "@sudobility/types": "^1.9.62" } }, "sha512-BugxR1yC5pSN97lN+bMz+mD87or+7dNHX+Qsof2QQHrYszPpuKjWNTYwQW2wma7ekUqWgykOU3iNDq+wC0KNQw=="],
 
