@@ -6,9 +6,9 @@
       "name": "testomniac_runner_mcp",
       "dependencies": {
         "@modelcontextprotocol/sdk": "^1.29.0",
-        "@sudobility/testomniac_runner": "^0.0.187",
-        "@sudobility/testomniac_runner_service": "^0.1.203",
-        "@sudobility/testomniac_types": "^0.0.106",
+        "@sudobility/testomniac_runner": "^0.0.188",
+        "@sudobility/testomniac_runner_service": "^0.1.204",
+        "@sudobility/testomniac_types": "^0.0.107",
         "puppeteer": "^25.0.4",
         "zod": "^4.4.3",
       },
@@ -35,17 +35,17 @@
 
     "@puppeteer/browsers": ["@puppeteer/browsers@3.0.3", "", { "dependencies": { "debug": "^4.4.3", "progress": "^2.0.3", "semver": "^7.7.4", "tar-fs": "^3.1.1", "yargs": "^17.7.2" }, "peerDependencies": { "proxy-agent": ">=8.0.1" }, "optionalPeers": ["proxy-agent"], "bin": { "browsers": "lib/main-cli.js" } }, "sha512-v3YaiGpzUTgOZkHBFR0iZg58Vto25SqBQxfLUXDiofJccwVl6Mlr7BdLCS1NZgxikdeIHf936cxYWL9IZp3tow=="],
 
-    "@sudobility/signic_sdk": ["@sudobility/signic_sdk@0.1.7", "", {}, "sha512-5XSgHSVsmyrMQ/ui1nDywwzt9dbRCsaeJ5tX6mKw2ZXbTZ82OsMr+dqDyV9XV3pfy7IHRIZq73af5KBamx72Fw=="],
+    "@sudobility/signic_sdk": ["@sudobility/signic_sdk@0.1.8", "", {}, "sha512-XFvmWtUUUVRkasS6tNKDmr5zY/6f+gEAV1ahQzejSROnuNp8rA6ncIvLGRhcniGC4teav6k0Ouc6i2xtxV1hDw=="],
 
-    "@sudobility/testomniac_runner": ["@sudobility/testomniac_runner@0.0.187", "", { "dependencies": { "@noble/curves": "^1.0.0", "@noble/hashes": "^1.0.0", "@sudobility/signic_sdk": "^0.1.7", "@sudobility/testomniac_runner_service": "^0.1.203", "@sudobility/testomniac_types": "^0.0.106", "hono": "^4.7.0", "jose": "^6.1.2", "openai": "^6.7.0", "pino": "^10.1.0", "postmark": "^4.0.7", "puppeteer-core": "^24.31.0" } }, "sha512-EzGDBSDNQoKLYmmxCx16TI8iNDWgw80t3IXaEsXOOpLM+M9Uw+sxhOIPlzDR6jhlrcTIrgdvwg0K7hTujaOtZw=="],
+    "@sudobility/testomniac_runner": ["@sudobility/testomniac_runner@0.0.188", "", { "dependencies": { "@noble/curves": "^1.0.0", "@noble/hashes": "^1.0.0", "@sudobility/signic_sdk": "^0.1.8", "@sudobility/testomniac_runner_service": "^0.1.204", "@sudobility/testomniac_types": "^0.0.107", "hono": "^4.7.0", "jose": "^6.1.2", "openai": "^6.7.0", "pino": "^10.1.0", "postmark": "^4.0.7", "puppeteer-core": "^24.31.0" } }, "sha512-fj9XjnGh7x9s8+lb4tOyoJc75cUUKhgQ7rkHJ8VEdyCVwhN0llWO2lnBvrzu16mQJhXylc/8q41KF9kOa2N8Vw=="],
 
-    "@sudobility/testomniac_runner_service": ["@sudobility/testomniac_runner_service@0.1.203", "", { "dependencies": { "@sudobility/webgraph_parser": "^0.0.8" }, "peerDependencies": { "@sudobility/testomniac_types": "^0.0.106" } }, "sha512-3xu8gz5wKMveCw9Rb7NDzepZun5jaZ3g8ehFz96P8nZ9VMLICHrqhFHVZt7riWSHJ6FUtWh7tGE7NLQCmwdtIQ=="],
+    "@sudobility/testomniac_runner_service": ["@sudobility/testomniac_runner_service@0.1.204", "", { "dependencies": { "@sudobility/webgraph_parser": "^0.0.9" }, "peerDependencies": { "@sudobility/testomniac_types": "^0.0.107" } }, "sha512-V2TFe/EXjtXr7wGLRHtgzUIWrG+BieEa5HP9s8p8XBWM481Rvf5FzAiQ17nwFFmoom77NK/RCMY3C39W5lD4+Q=="],
 
-    "@sudobility/testomniac_types": ["@sudobility/testomniac_types@0.0.106", "", { "peerDependencies": { "@sudobility/types": "^1.9.64" } }, "sha512-RZ1DJzhkWtldC0OMvCGGupLGCIK2Fkd0xqOwHvlgck4Y0JBjckIhSOez5u34E/EJHYQpOBhz0ghpe9y0ZGvGTQ=="],
+    "@sudobility/testomniac_types": ["@sudobility/testomniac_types@0.0.107", "", { "peerDependencies": { "@sudobility/types": "^1.9.67" } }, "sha512-cpuXVKyAx7vguaVO1P8rgARx5tgQ7CRBk2H/a8aw8JWeaGQIb4vlxrqQNSAZCCldPi2qwXtLLtidLjLm0wsrug=="],
 
     "@sudobility/types": ["@sudobility/types@1.9.62", "", {}, "sha512-GOkz5oE7Fmlolba2aemBF2fKPtH4I2lHAjVta+fqZAoAV72DQaWYzVEjTwKZs/ACY/g9Z262IDa7lEh+IOrn7w=="],
 
-    "@sudobility/webgraph_parser": ["@sudobility/webgraph_parser@0.0.8", "", { "peerDependencies": { "@sudobility/testomniac_types": "^0.0.106" } }, "sha512-wrxfslM1QPsaIskNXJinjmxjclzGiwEk0vHokZauWURQuJODeMHULI+vvsOFn8R20C6WycbsAUmWm9vGuzd9xQ=="],
+    "@sudobility/webgraph_parser": ["@sudobility/webgraph_parser@0.0.9", "", { "peerDependencies": { "@sudobility/testomniac_types": "^0.0.107" } }, "sha512-sgQf94AaMk5KBewD9iAFJKlVmDy1NkK+WE6R9TK0b7orMno6J7MBmeFKPrb4NG5txhhdNpJj43l5twzY/ilSpA=="],
 
     "@tootallnate/quickjs-emscripten": ["@tootallnate/quickjs-emscripten@0.23.0", "", {}, "sha512-C5Mc6rdnsaJDjO3UpGW/CQTHtCKaYlScZTly4JIu97Jxo/odCiH0ITnDXSJPTOrEKk/ycSZ0AOgTmkDtkOsvIA=="],
 

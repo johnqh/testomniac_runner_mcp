@@ -5,320 +5,334 @@ description: Use when testing a web application, verifying UI changes, checking 
 
 # Test App
 
-Test a web application using Testomniac. The MCP creates scans via
-the Testomniac API, and a separate runner process picks them up,
-launches a browser, crawls pages, runs expertises, and persists
-findings. The MCP polls for completion and returns results.
+Test a web application using Testomniac.
 
-## Architecture
+## Three execution paths — know which one you are on
 
-`run_full_scan` does NOT run scans in-process. It:
-1. Calls POST /api/v1/scan to create a pending discovery run
-2. Auto-starts a testomniac_runner daemon process (if not already running)
-3. The runner picks up the pending run and executes it
-4. The MCP polls the API until the run completes
-5. Human-readable `status_update` messages are logged to console during polling
+Tools in the `testomniac-runner` MCP do not all work the same way, and the
+difference decides what needs an API key and what can be stopped.
+
+| Path | Tools | Where the work happens | Needs API? |
+|------|-------|------------------------|-----------|
+| **In-process** | `browser_*`, all analysis, all expertise, all `generate_*`, `run_sequence` | The MCP's own browser | Only `run_sequence` |
+| **One-shot runner** | `execute_run`, `execute_sequence` | Spawned runner process that exits when done | Yes |
+| **Daemon** | `run_full_scan` | Spawned runner polling the API; the MCP polls for the result | Yes |
+
+`run_full_scan` does **not** scan in-process. It:
+
+1. Calls `POST /api/v1/scan` to create a pending discovery run
+2. Auto-starts a `testomniac_runner` daemon (if not already running)
+3. The runner claims the pending run and executes it
+4. The MCP polls the API until the run reaches `completed`, `failed`, or `stopped`
+5. `status_update` messages stream to the console while it waits
+
+Persona and scenario detection happen **server-side** when the API closes the
+run out — not in the runner, and not in this MCP.
 
 ## MCP Servers Used
 
-- **testomniac-runner** — Scan creation and polling, sequence execution,
-  scan lifecycle management
-  (run_full_scan, run_sequence, stop_scan, list_active_scans,
-  set_api_key, browser_launch, browser_navigate, browser_click,
-  browser_type, browser_screenshot, browser_close, browser_status)
-- **testomniac-api** (optional) — Query scan results, manage scenarios
-  (list_run_findings, get_finding_detail, list_run_pages,
-  get_run_summary, create_scenario, generate_sequence, list_products,
-  get_product, list_environments, list_personas)
+- **testomniac-runner** — browser control, page analysis, expertise evaluation,
+  test generation, and scan execution
+  (`set_api_key`, `browser_launch`, `browser_navigate`, `browser_click`,
+  `browser_type`, `browser_screenshot`, `browser_get_content`,
+  `browser_evaluate`, `browser_get_logs`, `browser_status`, `browser_close`,
+  `extract_actionable_items`, `extract_forms`, `detect_login_page`,
+  `evaluate_page_health`, `build_dom_snapshot`, `detect_scaffolds`,
+  `decompose_page`, `run_all_expertises`, `run_expertise`,
+  `generate_render_test`, `generate_interaction_test`, `generate_form_test`,
+  `generate_navigation_test`, `generate_e2e_test`, `run_full_scan`,
+  `run_sequence`, `execute_run`, `execute_sequence`, `stop_scan`,
+  `list_active_scans`)
+- **testomniac-api** (optional) — query results and manage scenarios
+  (`list_run_findings`, `get_run_findings_summary`, `get_finding_detail`,
+  `get_finding_script`, `list_run_pages`, `get_run_summary`,
+  `get_run_dashboard`, `list_entities`, `list_products`, `get_product`,
+  `list_environments`, `list_personas`, `create_scenario`, `list_scenarios`,
+  `generate_sequence`, `run_sequence`, `get_sequence_run`)
 
-## Prerequisites: Check Before Doing Anything
+## Prerequisites
 
-Before starting ANY flow, check these prerequisites in order. Stop
-at the first missing item and prompt the user.
+### 1. Target URL
 
-### 1. Check for Target URL
+If the user did not provide one:
 
-If the user did not provide a URL:
-
-1. Check the project's CLAUDE.md for a "Testing with Testomniac"
-   section or a dev server URL.
-2. If not found, ask:
-   > "What URL should I test? For example: `http://localhost:3000`
-   > or `https://staging.yourapp.com`"
+1. Check the project's CLAUDE.md for a "Testing with Testomniac" section or a
+   dev server URL.
+2. Otherwise ask:
+   > "What URL should I test? For example: `http://localhost:3000` or
+   > `https://staging.yourapp.com`"
 
 Do NOT proceed without a URL.
 
-### 2. Check API Key (required for all flows)
-
-All scan and scenario flows require a Testomniac API key. A local
-developer runner can use an entity API key (`tst_...`) for both scan
-creation and scanner endpoints. A server-side runner can use the global
-scanner API key.
-
-Attempt the scan — if it fails with "API not configured", prompt:
-
-> "I need a Testomniac API key to run scans.
->
-> **To get an API key:**
-> 1. Go to [https://testomniac.com](https://testomniac.com)
-> 2. Sign in or create an account
-> 3. Go to your organization settings and create an API key
->
-> Then tell me the key and I'll set it up. For example:
-> `Set the testomniac API key to tst_your_key_here`
->
-> If you also need to point to a different API server, include the URL:
-> `Set the testomniac API key to tst_... and API URL to https://api.testomniac.com`"
-
-Wait for the user to provide the key. Once provided, call `set_api_key`
-to configure it, then continue. For local development, set the local API
-URL too, for example:
-`Set the testomniac API key to tst_... and API URL to http://localhost:8027`
-
-### 3. Verify Dev Server is Running (for localhost URLs)
-
-If the URL starts with `http://localhost` or `http://127.0.0.1`:
+### 2. Dev server reachable (localhost URLs only)
 
 ```bash
 curl -s -o /dev/null -w "%{http_code}" <url>
 ```
 
-If not running, ask the user to start it first.
+If it is not up, ask the user to start it first.
 
-## Determine What the User Wants
+### 3. API key — for scan and scenario flows only
 
-Match the user's request to one of three flows:
+**Flow A needs no API key.** If the user has no key, or does not want to set
+one up, Flow A still gives them a real page audit. Offer it rather than
+blocking.
+
+Flows B, C and D need a key. Attempt the call; if it fails with
+"API not configured", prompt:
+
+> "I need a Testomniac API key for that.
+>
+> **To get one:**
+> 1. Go to [https://testomniac.com](https://testomniac.com)
+> 2. Sign in or create an account
+> 3. Open your organization settings and create an API key
+>
+> Then tell me the key, e.g. `Set the testomniac API key to tst_your_key_here`
+>
+> For a local API server, include the URL:
+> `Set the testomniac API key to tst_... and API URL to http://localhost:8027`
+>
+> Or I can run a page check right now with no key at all."
+
+`set_api_key` verifies the key against the API before saving it, and persists
+it so it survives a restart.
+
+## Route the request
 
 | User says | Flow |
 |-----------|------|
-| "quick scan", "test this page", "check for bugs", "health check" | **Flow A: Quick Scan** (minimum mode) |
-| "scan", "full scan", "scan my site", "complete scan" | **Flow B: Full Scan** (full mode) |
-| "test it as a shopper", "add to cart and check out", "test the login flow" | **Flow C: Scenario Test** |
-| "stop", "cancel", "abort the scan", "stop scanning" | **Stopping a Scan** (see below) |
+| "test this page", "check for bugs", "health check", "audit this URL", "any accessibility problems" | **Flow A: Page Check** (no API key) |
+| "quick scan", "what pages does it have", "map the site" | **Flow B: Quick Scan** |
+| "scan", "full scan", "scan my site", "complete scan" | **Flow C: Full Scan** |
+| "test it as a shopper", "add to cart and check out", "test the login flow" | **Flow D: Scenario Test** |
+| "stop", "cancel", "abort the scan" | **Stopping a Scan** |
 
-If the request includes "scan" in any form, use Flow A or B — never
-skip the runner. If unclear, default to Flow A (quick scan).
+If the request says "scan" in any form, use Flow B or C — do not substitute
+Flow A, which only sees one page. If unclear, ask which they want rather than
+guessing: Flow A takes seconds, Flow C can take many minutes.
+
+---
+
+## Flow A: Page Check (no API key)
+
+One page, in the MCP's own browser. Fast, and the only flow that works
+offline from the Testomniac API.
+
+1. `browser_navigate` to the URL.
+2. `browser_screenshot` — see what the user sees.
+3. `evaluate_page_health` — broken images, dead links, overlapping elements,
+   placeholder text, price and stock errors.
+4. `extract_actionable_items` — what is interactive on the page.
+5. `run_all_expertises` — SEO, security, performance, content, UI,
+   accessibility.
+6. `browser_get_logs` — console errors and failed requests. Logs accumulate
+   from page creation, so navigate before reading them.
+
+Then report, grouping by severity and using
+[references/finding-fixes.md](references/finding-fixes.md) for concrete fixes:
+
+> **Page Check: {URL}**
+>
+> **Issues ({N}):**
+> - [{type}] {title}
+>   - **Fix:** {concrete change}
+>
+> Want me to scan the whole site, or dig into one of these?
+
+Always `browser_close` when done.
+
+**Caveat to keep in mind:** `run_all_expertises` here builds a minimal context
+from the live page — no expectations, no before/after snapshots, no control
+states. Checks needing full test context are skipped, not failed. It is a page
+audit, not a scan-equivalent result set.
+
+---
+
+## Flow B: Quick Scan
+
+`scanMode: "minimum"` — discovers and captures pages without exercising
+interactions. The fast way to learn the site's structure.
+
+Call `run_full_scan` with `baseUrl` and `scanMode: "minimum"`. Status updates
+stream to the console while it polls.
+
+Useful extra arguments, all optional:
+
+- `scanScopePath` — confine discovery to a subtree, e.g. `/docs`
+- `sizeClass` — `"desktop"` (default) or `"mobile"`
+- `expertiseSlugs` — e.g. `["accessibility", "seo"]` to narrow the checks
+- `loginUrl` / `entityCredentialId` — to scan behind a login
+- `reportEmail` — email the finished report
+- `captureApi` — **off unless the user asks for it**; it sends request and
+  response bodies to the graph service
+
+Prefer the `run_full_scan` tool. The same flow also exists as a CLI in the
+plugin directory (`bun run scan:status <baseUrl> --scan-mode minimum`), but it
+needs that directory resolved first — `${CLAUDE_PLUGIN_ROOT}` when the variable
+is set in the shell, otherwise the checkout path. Only reach for it if the tool
+itself is unavailable.
+
+Report:
+
+> **Quick Scan Complete: {URL}**
+>
+> - Pages discovered: {pagesFound}
+> - Page states: {pageStatesFound}
+> - Duration: {totalDurationMs}ms
+> - Status: {status}
+>
+> Want me to run a **full scan** with interaction testing, or test a specific
+> **user flow**?
+
+---
+
+## Flow C: Full Scan
+
+`scanMode: "full"` — discovers pages **and** exercises interactions: clicks,
+hovers, form submissions, keyboard actions. Finds far more, takes far longer.
+
+Call `run_full_scan` with `baseUrl` and `scanMode: "full"`, plus any of the
+optional arguments listed in Flow B. `quickScan: true` is a shorthand that
+makes the server pick `partial` mode — a middle setting that skips redundant
+hover tests.
+
+Report as in Flow B, plus `testRunsCompleted`, then offer the findings
+drilldown below.
+
+---
+
+## Flow D: Scenario Test
+
+Tests a named user journey. **Requires a prior scan** (Flow B or C) so the
+system knows what pages and elements exist. If none has run:
+
+> "I need to scan the site first to discover pages and elements. Want me to
+> run a quick scan?"
+
+### Step 1: Identify product, runner, and environment
+
+1. `list_products` (testomniac-api) with the entity slug. If you do not know
+   it, `list_entities` lists the user's workspaces — but note it needs a
+   Firebase token, so under API-key auth just ask:
+   > "What's your Testomniac organization name or entity slug?"
+2. If several products, ask which.
+3. `get_product` → the runner ID.
+4. `list_environments` → the test environment ID.
+
+### Step 2: Create the scenario
+
+Build it from the user's words:
+
+- **title** — short name, e.g. "Shopper adds item to cart"
+- **startingPath** — where to begin, e.g. `/`
+- **prompt** — the full description, e.g. "As a shopper, browse products, add
+  an item to the cart, proceed to checkout, and complete the purchase"
+
+If the request is vague, ask:
+> "What user flow should I test? Describe what a user would do, step by step.
+> For example: 'Go to the store, add an item to the cart, and check out'."
+
+Call `create_scenario` with **`runnerId`**, title, startingPath, prompt, and
+optionally `personaId` and `sizeClass`. The runner ID is required — scenarios
+live under a runner, and the scenario ID alone is not enough to update or
+delete one later.
+
+### Step 3: Generate the sequence
+
+`generate_sequence` with the scenario ID and the test environment ID. This is
+an AI call on the server; it returns 503 if the API has no AI credentials and
+404 if no pages have been discovered.
+
+> **Scenario: {title}**
+> Generated {N} test steps. Ready to run?
+
+### Step 4: Run it
+
+Two tools share the name `run_sequence`. You need both, in order:
+
+1. **testomniac-api** `run_sequence` with the **sequence ID** — creates a
+   pending sequence run and returns its ID.
+2. **testomniac-runner** `run_sequence` with that **`sequenceRunId`** and the
+   **`runnerId`** — executes the steps in the MCP's own browser.
+
+The runner-side call leaves the browser on the final page, which is what makes
+the next step possible.
+
+### Step 5: Continue interactively
+
+The generated sequence gets the flow started; it rarely finishes a real
+journey. Loop, at most 10 times:
+
+1. `browser_screenshot` — current state.
+2. `extract_actionable_items` — what can be done next.
+3. Decide: goal reached? stuck? more steps needed?
+4. Act — `browser_click`, `browser_type`, `browser_navigate`.
+
+Exit when the goal is reached, the state repeats twice, an error page appears,
+or you hit the iteration cap. Say which of those ended it.
+
+### Step 6: Report and clean up
+
+> **Scenario Test: {title}**
+>
+> Status: {PASS/FAIL} — {passed} of {N} steps passed
+>
+> **What happened:**
+> 1. {step by step}
+>
+> **Findings ({F}):**
+> - [{type}] {title} — **Page:** {path} — **Fix:** {fix}
+
+Always `browser_close`.
 
 ---
 
 ## Stopping a Scan
 
-If the user says "stop", "cancel", "abort the scan", or similar while
-a scan is running:
+1. `list_active_scans` (testomniac-runner) for the scan IDs.
+2. `stop_scan` with the `testRunId`.
+3. Report:
+   > "Scan stopped — the current interaction finished and the rest was
+   > cancelled. Interactions completed: {N}."
 
-1. Call `list_active_scans` (testomniac-runner) to get active scan IDs.
-2. If there are active scans, call `stop_scan` with the `testRunId`.
-   - The current interaction will finish, then remaining work is
-     cancelled and the run is marked as "stopped".
-3. Report to the user:
-   > "Scan stopped. The current interaction finished and remaining
-   > work was cancelled."
-   >
-   > - Interactions completed before stop: {N}
-   > - Status: stopped
+The stop signal travels over the runner daemon's stdin, so it reaches **only**
+scans that `run_full_scan` started in this session. It cannot stop an
+`execute_run` one-shot, and it cannot stop a scan started before this MCP
+server booted. If `list_active_scans` is empty, the scan already finished —
+report its results instead.
 
-If `list_active_scans` returns an empty list, the scan may have
-already finished. Check the last scan results instead.
-
----
-
-## Flow A: Quick Scan (minimum mode)
-
-Navigates all public pages and captures content without running
-interaction tests. Fast way to discover the site structure and get
-baseline findings.
-
-### Step 1: Run the Scan
-
-Tell the user the scan is starting, then run this Bash command so
-status updates are visible in Claude Code's console:
-
-```bash
-cd /Users/johnhuang/projects/testomniac_runner_mcp
-bun run scan:status <baseUrl> --scan-mode minimum
-```
-
-This will:
-- Create a discovery run via the API
-- A separate runner process picks it up automatically
-- The CLI polls until the run completes and prints `status_update` messages to stdout
-- Return results with page count and run status
-
-**Important:** The tool blocks while polling. If the scan times out
-or the runner is not running, it returns an error.
-
-### Step 2: Report Results
-
-Parse the `run_full_scan` response and report:
-
-> **Quick Scan Complete: {URL}**
->
-> - Pages discovered: {pagesFound}
-> - Interactions completed: {testRunsCompleted}
-> - Duration: {totalDurationMs}ms
-> - Status: {status}
-> - Last status: {status_update}
->
-> Want me to:
-> - Run a **full scan** with interaction testing?
-> - Test a specific **user flow** (e.g., "test it as a shopper")?
-
----
-
-## Flow B: Full Scan (full mode)
-
-Comprehensive scan that navigates pages AND tests all interactions
-(clicks, hovers, form submissions, keyboard actions). Finds more
-bugs but takes longer.
-
-### Step 1: Run the Scan
-
-Tell the user the scan is starting, then run this Bash command so
-status updates are visible in Claude Code's console:
-
-```bash
-cd /Users/johnhuang/projects/testomniac_runner_mcp
-bun run scan:status <baseUrl> --scan-mode full
-```
-
-This creates a discovery run and polls until the runner completes it.
-Detailed `status_update` messages are emitted while the runner navigates,
-runs interactions, records results, and detects personas.
-
-### Step 2: Report Results
-
-Parse the response and report:
-
-> **Full Scan Complete: {URL}**
->
-> - Pages discovered: {pagesFound}
-> - Interactions completed: {testRunsCompleted}
-> - Duration: {totalDurationMs}ms
-> - Status: {status}
-> - Last status: {status_update}
-
----
-
-## Flow C: Scenario Test
-
-Tests a specific user journey (e.g., "go to the store, add an item
-to the cart, check out"). Requires a prior scan so the system knows
-what pages and elements exist.
-
-**Prerequisite:** A scan (Flow A or B) must have been run first.
-If not, tell the user:
-> "I need to scan the site first to discover pages and elements.
-> Want me to run a quick scan first?"
-
-### Step 1: Identify Product, Runner, and Environment
-
-1. Call `list_products` (testomniac-api) with the user's entity slug.
-   - If entity slug unknown, ask:
-     > "What's your Testomniac organization name or entity slug?"
-   - If no products, offer to run a scan first.
-2. If multiple products, ask the user to pick one.
-3. Call `get_product` to get product details and runner ID.
-4. Call `list_environments` to get the test environment ID.
-   - If no environments, a scan needs to run first.
-
-### Step 2: Create Scenario and Generate Sequence
-
-1. Build the scenario from the user's request:
-   - **title**: Short name (e.g., "Shopper adds item to cart")
-   - **startingPath**: URL path to start from (e.g., "/")
-   - **prompt**: Full description of what to test, derived from the
-     user's words (e.g., "As a shopper, browse products, add an item
-     to the cart, proceed to checkout, and complete the purchase")
-
-   If the user's request is vague, ask:
-   > "What user flow should I test? Describe what a user would do,
-   > step by step. For example:
-   > - 'Go to the store, add an item to the cart, and check out'
-   > - 'Search for a product and apply filters'
-   > - 'Log in with invalid credentials and verify the error'"
-
-2. Call `create_scenario` with the runner ID, title, startingPath,
-   and prompt.
-
-3. Call `generate_sequence` with the scenario ID and environment ID.
-
-4. Report what was generated:
-   > **Scenario: {title}**
-   > Generated {N} test steps. Ready to run?
-
-### Step 3: Create and Run the Sequence Run
-
-Call `run_sequence` on **testomniac-api** with the generated sequence ID.
-This creates a pending sequence run and returns its run ID.
-
-Then call `run_sequence` on **testomniac-runner** with:
-- `sequenceRunId`: the sequence run ID returned by testomniac-api
-- `runnerId`: the runner ID
-
-This executes all steps through the runner with expertise evaluation
-and finding persistence.
-
-### Step 4: Self-Healing Loop
-
-After `run_sequence` completes, check if the flow goal was reached.
-The browser remains on the final page.
-
-**Loop (max 10 iterations):**
-
-1. Call `browser_screenshot` to see the current state.
-2. Call `extract_actionable_items` to see available interactions.
-3. Evaluate: Is the goal reached? Stuck? More steps needed?
-4. If more steps needed, execute the next logical action:
-   - `browser_click` for buttons/links
-   - `browser_type` for form fields
-   - `browser_navigate` if needed
-5. Go back to step 1.
-
-**Exit when:** goal reached, stuck (same state twice), error page,
-or max iterations.
-
-### Step 5: Report Results
-
-> **Scenario Test Complete: {title}**
->
-> Status: {PASS/FAIL}
-> Steps executed: {N} ({passed} passed, {failed} failed)
->
-> **Flow summary:**
-> 1. {what happened at each step}
->
-> **Findings ({F}):**
-> - [{type}] {title}
->   - **Page:** {path}
->   - **Fix:** {suggested fix}
-
-### Step 6: Cleanup
-
-Always call `browser_close` when done.
+Partial results are real results: a stopped run keeps everything it found
+before the stop.
 
 ---
 
 ## Finding Detail Drilldown
 
-After reporting findings, offer:
+On a scan with many findings, start with `get_run_findings_summary`
+(testomniac-api) — it groups repeated instances of one rule into a single row,
+which is usually what the user wants to read. Use `list_run_findings` for the
+full list.
 
-> "Want details on any finding? I can show reproduction steps and
-> a Playwright script."
+Then offer:
 
-When asked about a specific finding:
+> "Want details on any finding? I can show reproduction steps and a Playwright
+> script."
 
-1. Call `get_finding_detail` (testomniac-api) with the finding ID.
-2. Report:
+`get_finding_detail` returns the finding, the interaction that triggered it,
+the full dependency chain, and a runnable Playwright script with the
+prerequisite interactions replayed in order. `get_finding_script` returns just
+the script.
 
 > **Finding: {title}**
 >
 > **Description:** {description}
-> **Severity:** {type} (priority {priority})
+> **Severity:** {type}
 > **Page:** {path}
 >
 > **Reproduction steps:**
-> 1. {dependency interaction 1}
-> 2. {the interaction that found the issue}
+> 1. {dependency interaction}
+> 2. {the interaction that found it}
 >
 > **Playwright script:**
 > ```typescript
@@ -327,20 +341,22 @@ When asked about a specific finding:
 
 ## Re-verification
 
-After fixing issues, offer to re-run:
-> "Want me to re-run the scan to verify the fixes?"
+After fixes, offer to re-run the same flow: "Want me to re-run the scan to
+verify the fixes?"
 
 ## Error Handling
 
 | Error | Response |
 |-------|----------|
-| API not configured | Prompt for API key (see prerequisites) |
-| Scan timed out | "The scan timed out. The runner may have crashed. Check the console logs for errors." |
-| Failed to create discovery run | Check the API URL and key are correct. The API server must be running. |
-| Failed to poll test run | API may be down or the key may be invalid. |
+| API not configured | Offer Flow A now, and prompt for a key for the rest (see prerequisites) |
+| API key rejected | The key was refused by `/auth/test`. Check it is the right key for that API URL — an entity key from one server will not work against another. |
+| Failed to create discovery run | Check the API URL and key, and that the API server is running. |
+| Scan sits at "pending" and never starts | Nothing claimed the run. The runner daemon may have failed to launch, cannot reach the API, or is authenticating as a different entity than the one that owns the run. Check the console for `[testomniac:runner-daemon]` lines. |
+| Browser fails to launch | Run `bun install` so Puppeteer downloads its browser, or set `CHROMIUM_PATH` to a Chrome/Chromium binary. |
+| Scan timed out | Polling gives up after 10 minutes. The run may still be going — check its status rather than assuming it died. |
 | No pages discovered | "The site hasn't been scanned yet. Want me to run a quick scan first?" |
 | Entity slug unknown | "What's your Testomniac organization name? Find it at testomniac.com in your org settings." |
-| No products found | "No products found. Run a scan first — it will create one automatically." |
+| No products found | "No products found. Run a scan first — it creates one automatically." |
+| `generate_sequence` returns 503 | The API has no AI credentials configured. Scenario generation is unavailable; the scan flows still work. |
 | No active scan to stop | "No scan is currently running. It may have already finished." |
-| Runner daemon not running | "The runner daemon is not running. The scan may have already completed or crashed." |
-| Scan status is "stopped" | The scan was stopped gracefully. Report partial results and offer to re-run. |
+| Scan status is "stopped" | Stopped gracefully. Report the partial results and offer to re-run. |

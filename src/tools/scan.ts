@@ -131,7 +131,7 @@ async function pollTestRun(
   let lastStatusMessage = "";
 
   while (Date.now() - start < POLL_TIMEOUT_MS) {
-    const res = await fetch(`${apiUrl}/api/v1/scanner/test-runs/${testRunId}`, {
+    const res = await fetch(`${apiUrl}/api/v1/test-runs/${testRunId}`, {
       headers,
       cache: "no-store",
     });
@@ -188,20 +188,49 @@ export function registerScanTools(server: McpServer) {
         .enum(["full", "partial", "minimum"])
         .optional()
         .describe(
-          "Scan depth: 'full' runs all interactions (default), 'partial' skips redundant hover tests, 'minimum' only navigates pages without interaction testing"
+          "Scan depth: 'full' runs all interactions, 'partial' skips redundant hover tests, 'minimum' only navigates pages without interaction testing. Defaults server-side to 'partial' when quickScan is set, otherwise 'full'."
+        ),
+      quickScan: z
+        .boolean()
+        .optional()
+        .describe("Shallow single-pass scan; implies scanMode 'partial'"),
+      scanScopePath: z
+        .string()
+        .optional()
+        .describe("Restrict discovery to URLs under this path (e.g. '/docs')"),
+      expertiseSlugs: z
+        .array(z.string())
+        .optional()
+        .describe(
+          "Limit checks to these expertises (e.g. ['accessibility','seo']). 'tester' is always included by the server."
+        ),
+      loginUrl: z
+        .string()
+        .optional()
+        .describe("URL of the login page, if the site needs authenticating"),
+      entityCredentialId: z
+        .number()
+        .optional()
+        .describe("Stored entity credential to log in with"),
+      reportEmail: z
+        .string()
+        .optional()
+        .describe("Email address to send the finished report to"),
+      captureApi: z
+        .boolean()
+        .optional()
+        .describe(
+          "Send the site's API traffic to the graph service. Off unless explicitly asked for — request and response bodies leave the runner."
         ),
     },
-    async ({ baseUrl, sizeClass, scanMode }, extra) => {
+    async ({ baseUrl, ...scanOptions }, extra) => {
       const statusUpdates: string[] = [];
       const reportStatus = createStatusReporter(server, statusUpdates, extra);
       // Step 1: Create discovery run via API
       let discovery;
       try {
         await reportStatus(`Creating discovery scan for ${baseUrl}...`);
-        discovery = await createDiscoveryRun(baseUrl, {
-          sizeClass,
-          scanMode: scanMode ?? "full",
-        });
+        discovery = await createDiscoveryRun(baseUrl, scanOptions);
         await reportStatus(
           `Scan created: testRunId=${discovery.testRunId}, runnerId=${discovery.runnerId}`
         );
@@ -226,7 +255,7 @@ export function registerScanTools(server: McpServer) {
 
       // Step 2: Ensure runner daemon is running
       try {
-        ensureRunnerDaemon();
+        await ensureRunnerDaemon();
       } catch (err) {
         return {
           content: [
@@ -451,7 +480,7 @@ export function registerScanTools(server: McpServer) {
     async ({ runId, runnerId, baseUrl, sizeClass, scanMode }) => {
       const logs: string[] = [];
       try {
-        const { done } = spawnRunner({
+        const { done } = await spawnRunner({
           runId,
           runnerId,
           baseUrl,
@@ -504,7 +533,7 @@ export function registerScanTools(server: McpServer) {
     async ({ sequenceRunId, runnerId }) => {
       const logs: string[] = [];
       try {
-        const { done } = spawnRunner({
+        const { done } = await spawnRunner({
           sequenceRunId,
           runnerId,
           onStdout: line => logs.push(line),
@@ -546,7 +575,7 @@ export function registerScanTools(server: McpServer) {
 
   server.tool(
     "stop_scan",
-    "Stop an active scan gracefully. The current interaction will finish, then remaining work is cancelled and the run is marked as stopped.",
+    "Stop an active scan gracefully. The current interaction finishes, then remaining work is cancelled and the run is closed out with status 'stopped'. Only reaches scans started by run_full_scan in this session — the signal travels over the runner daemon's stdin, so a one-shot execute_run cannot be stopped this way.",
     {
       testRunId: z
         .number()
@@ -591,7 +620,7 @@ export function registerScanTools(server: McpServer) {
 
   server.tool(
     "list_active_scans",
-    "List all currently active scans started by this MCP session.",
+    "List the scans run_full_scan started in this session and has not yet seen finish. Scans started elsewhere, or before this server booted, are not tracked here.",
     {},
     async () => {
       const scans = Array.from(activeScans.entries()).map(

@@ -7,6 +7,7 @@ import { spawn, type ChildProcess } from "child_process";
 import { resolve } from "path";
 import { getApiConfig } from "./api-config.ts";
 import { getRunnerIdentity } from "./runner-identity.ts";
+import { chromiumEnv } from "./chromium.ts";
 
 function getRunnerPath(): string {
   // Resolve from node_modules (installed as npm dependency)
@@ -37,10 +38,10 @@ export interface RunnerProcessOptions {
   onStderr?: (line: string) => void;
 }
 
-export function spawnRunner(options: RunnerProcessOptions): {
+export async function spawnRunner(options: RunnerProcessOptions): Promise<{
   process: ChildProcess;
   done: Promise<{ exitCode: number | null }>;
-} {
+}> {
   const config = getApiConfig();
   if (!config.apiUrl || !config.apiKey) {
     throw new Error(
@@ -73,6 +74,7 @@ export function spawnRunner(options: RunnerProcessOptions): {
       TESTOMNIAC_RUNNER_PROCESS_INSTANCE_ID: identity.id,
       TESTOMNIAC_RUNNER_INSTANCE_ID: identity.id,
       TESTOMNIAC_RUNNER_INSTANCE_NAME: identity.name,
+      ...(await chromiumEnv()),
     },
     stdio: ["ignore", "pipe", "pipe"],
   });

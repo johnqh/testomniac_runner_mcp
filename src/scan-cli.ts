@@ -100,7 +100,7 @@ async function pollTestRun(testRunId: number): Promise<TestRunStatus> {
   let lastStatusMessage = "";
 
   while (Date.now() - start < POLL_TIMEOUT_MS) {
-    const res = await fetch(`${apiUrl}/api/v1/scanner/test-runs/${testRunId}`, {
+    const res = await fetch(`${apiUrl}/api/v1/test-runs/${testRunId}`, {
       headers: { "X-Scanner-Key": apiKey },
       cache: "no-store",
     });
@@ -130,7 +130,11 @@ async function pollTestRun(testRunId: number): Promise<TestRunStatus> {
       lastTestRunsCompleted = completed;
     }
 
-    if (run.status === "completed" || run.status === "failed") {
+    if (
+      run.status === "completed" ||
+      run.status === "failed" ||
+      run.status === "stopped"
+    ) {
       return run;
     }
 
@@ -149,7 +153,7 @@ async function main() {
   });
   if (discovery.status_update) interactionStatus(discovery.status_update);
 
-  ensureRunnerDaemon();
+  await ensureRunnerDaemon();
   const run = await pollTestRun(discovery.testRunId);
 
   console.log(

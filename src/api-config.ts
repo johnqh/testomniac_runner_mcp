@@ -81,18 +81,30 @@ export function getApiConfig(): {
  * the product, runner, environment, and test run in one call.
  * Passes the entity API key via x-api-key header when available.
  */
+export interface DiscoveryRunOptions {
+  sizeClass?: "desktop" | "mobile";
+  scanMode?: "full" | "partial" | "minimum";
+  quickScan?: boolean;
+  scanScopePath?: string;
+  expertiseSlugs?: string[];
+  loginUrl?: string;
+  entityCredentialId?: number;
+  reportEmail?: string;
+  captureApi?: boolean;
+}
+
 export async function createDiscoveryRun(
   baseUrl: string,
-  options: {
-    sizeClass?: "desktop" | "mobile";
-    scanMode?: "full" | "partial" | "minimum";
-  } = {}
+  options: DiscoveryRunOptions = {}
 ): Promise<{
   testRunId: number;
   runnerId: number;
   productId: number;
   testEnvironmentId: number;
+  status?: string;
+  message?: string;
   status_update?: string;
+  suggestedNextStep?: string;
 }> {
   if (!apiUrl) {
     throw new Error(
@@ -105,30 +117,58 @@ export async function createDiscoveryRun(
   if (apiKey) {
     headers["x-api-key"] = apiKey;
   }
+  // Send only what the caller set. scanMode in particular must stay absent
+  // when unspecified: the API derives it from quickScan, and forcing "full"
+  // here would silently override a quick scan.
+  const body: Record<string, unknown> = { url: baseUrl };
+  for (const [key, value] of Object.entries(options)) {
+    if (value !== undefined) body[key] = value;
+  }
   const res = await fetch(`${apiUrl}/api/v1/scan`, {
     method: "POST",
     headers,
-    body: JSON.stringify({
-      url: baseUrl,
-      ...(options.sizeClass ? { sizeClass: options.sizeClass } : {}),
-      ...(options.scanMode ? { scanMode: options.scanMode } : {}),
-    }),
+    body: JSON.stringify(body),
   });
   const json = (await res.json()) as {
     success: boolean;
     error?: string;
     data?: {
-      testRunId: number;
-      runnerId: number;
-      productId: number;
-      testEnvironmentId: number;
+      testRunId?: number;
+      runnerId?: number;
+      productId?: number;
+      testEnvironmentId?: number;
+      status?: string;
+      message?: string;
       status_update?: string;
+      suggestedNextStep?: string;
     };
   };
   if (!json.success || !json.data) {
-    throw new Error(`Failed to create discovery run: ${json.error ?? res.statusText}`);
+    throw new Error(
+      `Failed to create discovery run: ${json.error ?? res.statusText}`
+    );
   }
-  return json.data;
+  // CreateDiscoveryRunResponse permits a success envelope that declines to
+  // start a run — status "duplicate_owned" / "duplicate_unclaimed" /
+  // "validation_error" with no testRunId. Today's API only ever answers
+  // "pending", but without this guard that contract change would surface as a
+  // poll against run "undefined".
+  if (json.data.testRunId == null) {
+    throw new Error(
+      json.data.message ??
+        `Scan not started (status: ${json.data.status ?? "unknown"})`
+    );
+  }
+  return json.data as {
+    testRunId: number;
+    runnerId: number;
+    productId: number;
+    testEnvironmentId: number;
+    status?: string;
+    message?: string;
+    status_update?: string;
+    suggestedNextStep?: string;
+  };
 }
 
 /**
