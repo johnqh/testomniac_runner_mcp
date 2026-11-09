@@ -71,26 +71,15 @@ bun run scan:status <url> [--scan-mode minimum|partial|full] [--size-class deskt
 
 ## Project Structure
 
-```
-src/
-├── index.ts             # Entry point: server setup, signal handlers, transport
-├── browser-session.ts   # Puppeteer lifecycle + the BrowserAdapter the library consumes
-├── api-config.ts        # API URL/key state, .mcp.json persistence, createDiscoveryRun()
-├── chromium.ts          # Resolves a Chromium path to hand the spawned runner
-├── runner-identity.ts   # Stable runner instance id/name, cached in .runner-instance.json
-├── runner-process.ts    # Spawns testomniac_runner one-shot (--run-id / --sequence-run-id)
-├── runner-daemon.ts     # Spawns/stops the polling runner; stop_run IPC over stdin
-├── scan-cli.ts          # `bun run scan:status` — run_full_scan as a CLI
-└── tools/
-    ├── config.ts            # set_api_key
-    ├── browser.ts           # browser_launch/close/status/navigate/click/type/screenshot/get_content/evaluate/get_logs
-    ├── analysis.ts          # extract_actionable_items, extract_forms, detect_login_page,
-    │                        #   evaluate_page_health, build_dom_snapshot, detect_scaffolds, decompose_page
-    ├── test-generation.ts   # generate_render/interaction/form/navigation/e2e_test
-    ├── expertise.ts         # run_all_expertises, run_expertise
-    └── scan.ts              # run_full_scan, run_sequence, execute_run, execute_sequence,
-                             #   stop_scan, list_active_scans
-```
+`src/index.ts` is the entry point (server setup, signal handlers, stdio
+transport); it registers the six tool groups in `src/tools/` (`config`,
+`browser`, `analysis`, `test-generation`, `expertise`, `scan`). Supporting
+modules: `browser-session.ts` (Puppeteer lifecycle + the `BrowserAdapter` the
+library consumes), `api-config.ts` (API URL/key state, `.mcp.json` persistence,
+`createDiscoveryRun()`), `chromium.ts` (Chromium path for the spawned runner),
+`runner-identity.ts` (stable instance id/name, cached in `.runner-instance.json`),
+`runner-process.ts` (one-shot spawn), `runner-daemon.ts` (polling runner +
+`stop_run` IPC over stdin), `scan-cli.ts` (`bun run scan:status`).
 
 ## Environment Variables
 
@@ -116,39 +105,20 @@ different ways, all of which that middleware accepts:
 
 ## Tools (31)
 
-### Configuration (1)
-- `set_api_key` — Set and persist the API key (and optionally URL). Verifies it against `/auth/test` before saving.
+Registered across `src/tools/`; full names + descriptions are in the README.
+Counts: config 1 (`set_api_key`), browser 10, analysis 7, test-generation 5,
+expertise 2, execution 6. The non-obvious parts:
 
-### Browser Control (10)
-`browser_launch`, `browser_close`, `browser_status`, `browser_navigate`,
-`browser_click`, `browser_type`, `browser_screenshot`, `browser_get_content`,
-`browser_evaluate`, `browser_get_logs`
-
-### Page Analysis (7)
-`extract_actionable_items`, `extract_forms`, `detect_login_page`,
-`evaluate_page_health`, `build_dom_snapshot`, `detect_scaffolds`,
-`decompose_page`
-
-### Test Generation (5)
-`generate_render_test`, `generate_interaction_test`, `generate_form_test`,
-`generate_navigation_test`, `generate_e2e_test`
-
-### Expertise Evaluation (2)
-- `run_all_expertises` — every module against the current page
-- `run_expertise` — one of tester, seo, security, performance, content, ui, accessibility
-
-Both build a *minimal* `ExpertiseContext` from the live page: no expectations,
-no before/after UI snapshots, no control states. Checks that need full test
-context are skipped rather than reported — treat the output as a page audit,
-not as scan-equivalent findings.
-
-### Execution (6)
-- `run_full_scan` — create a discovery run, start the daemon, poll to completion
-- `run_sequence` — execute a sequence in-process on the MCP's own browser, leaving it on the final page
-- `execute_run` — one-shot spawned runner for a specific run
-- `execute_sequence` — one-shot spawned runner for a specific sequence run
-- `stop_scan` — graceful stop of a `run_full_scan` scan from this session
-- `list_active_scans` — scans this session started and has not seen finish
+- **`set_api_key`** verifies the key against `/auth/test` before saving, then
+  persists it into `.mcp.json`.
+- **Expertise** (`run_all_expertises`, `run_expertise`) builds a *minimal*
+  `ExpertiseContext` from the live page: no expectations, no before/after UI
+  snapshots, no control states. Checks that need full test context are skipped
+  rather than reported — treat the output as a page audit, not scan-equivalent
+  findings.
+- **Execution** splits across the three paths above: `run_sequence` (in-process),
+  `execute_run` / `execute_sequence` (one-shot spawn), `run_full_scan` +
+  `stop_scan` + `list_active_scans` (daemon).
 
 ## Plugin & Skill
 
@@ -169,6 +139,12 @@ Keep the skill honest about which of the three execution paths a flow uses; it
 is the most common thing to get out of date here.
 
 ## Gotchas
+
+- **`bun install` needs GitHub Packages auth.** The `@sudobility/*` deps are on
+  GitHub Packages, not npmjs; `.npmrc` maps the `@sudobility` scope to
+  `npm.pkg.github.com` but carries no token. A `read:packages` token must be in
+  the global `~/.npmrc` (`//npm.pkg.github.com/:_authToken=…`) or the install
+  fails to resolve them. CI passes it as `GH_PACKAGES_READ_TOKEN`.
 
 - **`run_full_scan` does not scan.** It creates the run over HTTP and waits.
   The work happens in a separate `testomniac_runner` process. A scan can sit

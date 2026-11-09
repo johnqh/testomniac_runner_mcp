@@ -20,12 +20,28 @@ It also ships with a `/test-app` skill that orchestrates these tools into a guid
 
 - [Bun](https://bun.sh/) runtime (v1.0+)
 - Puppeteer downloads a bundled Chromium automatically on `bun install`
+- **GitHub Packages access.** The `@sudobility/*` dependencies are published to
+  GitHub Packages, not npmjs. `.npmrc` routes the `@sudobility` scope to
+  `npm.pkg.github.com`, so `bun install` needs a GitHub token with the
+  `read:packages` scope or it will fail to resolve those packages.
 
 ## Installation
 
 ```bash
 git clone <repo-url> testomniac_runner_mcp
 cd testomniac_runner_mcp
+```
+
+Authenticate to GitHub Packages before installing. Add the token to your global
+`~/.npmrc` (the repo's `.npmrc` only maps the scope, it holds no token):
+
+```
+//npm.pkg.github.com/:_authToken=<YOUR_GH_PACKAGES_READ_TOKEN>
+```
+
+Then install:
+
+```bash
 bun install
 ```
 
@@ -298,10 +314,12 @@ Or just describe what you want:
 ## Development
 
 ```bash
-bun run dev        # Run MCP server (stdio mode)
-bun run build      # Bundle to dist/index.js
-bun run typecheck  # TypeScript type checking
-bun run start      # Run production bundle
+bun run dev          # Run MCP server (stdio mode)
+bun run build        # Bundle to dist/index.js
+bun run typecheck    # TypeScript type checking
+bun run start        # Run production bundle
+bun run scan:status <url> [--scan-mode minimum|partial|full] [--size-class desktop|mobile]
+                     # run_full_scan as a CLI: streams status to stdout, stops the daemon on exit
 ```
 
 ### Project Structure
